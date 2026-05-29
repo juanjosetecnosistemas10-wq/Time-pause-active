@@ -1,0 +1,25 @@
+{
+  "intervalo_min": 15,
+  "duracion_pausa_min": 2,
+  "hora_inicio": "08:00",
+  "hora_fin": "18:00",
+  "ejercicios_activos": [
+    "cuello",
+    "hombros",
+    "espalda",
+    "visual",
+    "manos",
+    "sentad",
+    "respira",
+    "postura"
+  ],
+  "sonido": true,
+  "posponer_min": 10,
+  "autoarranque": false,
+  "meta_pausas": 6,
+  "no_molestar": false,
+  "agua_activo": true,
+  "agua_min": 30,
+  "fin_de_semana": true,
+  "sonido_ambiente": "lluvia"
+}

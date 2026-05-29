@@ -1,0 +1,19 @@
+{
+  "fecha": "2026-05-29",
+  "completadas": 0,
+  "saltadas": 2,
+  "historial": [
+    {
+      "hora": "13:42",
+      "ejercicio": "Caminar",
+      "estado": "saltada"
+    },
+    {
+      "hora": "13:44",
+      "ejercicio": "Ejercicio de manos",
+      "estado": "saltada"
+    }
+  ],
+  "racha": 0,
+  "meta_cumplida": false
+}
