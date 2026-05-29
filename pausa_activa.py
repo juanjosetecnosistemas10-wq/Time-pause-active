@@ -13,21 +13,38 @@ except ImportError:
 
 import sys
 
+APP_NAME    = "PausasActivas"
+APP_DISPLAY = "Pausas Activas"
+APP_PATH    = sys.executable if getattr(sys, "frozen", False) else os.path.abspath(__file__)
+INSTALL_DIR_REG = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\PausasActivas"
+PROGRAMS_DIR = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~\\AppData\\Local")), APP_DISPLAY)
+
+def _get_install_dir_from_registry():
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, INSTALL_DIR_REG, 0, winreg.KEY_READ)
+        val, _ = winreg.QueryValueEx(key, "InstallLocation")
+        winreg.CloseKey(key)
+        return val
+    except Exception:
+        return ""
+
+def _is_installed():
+    """True si la app fue instalada (existe entrada en registro)."""
+    return bool(_get_install_dir_from_registry())
+
 def _get_app_dir():
-    """Devuelve la carpeta donde corre la app, tanto en .py como en .exe (PyInstaller)."""
+    """Si instalado, datos en carpeta instalacion. Si no, junto al exe."""
     if getattr(sys, "frozen", False):
-        # Corriendo como .exe compilado con PyInstaller
+        installed = _get_install_dir_from_registry()
+        if installed and os.path.isdir(installed):
+            return installed
         return os.path.dirname(sys.executable)
-    else:
-        # Corriendo como script .py normal
-        return os.path.dirname(os.path.abspath(__file__))
+    return os.path.dirname(os.path.abspath(__file__))
 
 APP_DIR     = _get_app_dir()
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
 STATS_FILE  = os.path.join(APP_DIR, "stats.json")
 HIST_FILE   = os.path.join(APP_DIR, "historial.csv")
-APP_NAME    = "PausasActivas"
-APP_PATH    = sys.executable if getattr(sys, "frozen", False) else os.path.abspath(__file__)
 
 DEFAULT_CONFIG = {
     "intervalo_min": 45,
@@ -832,11 +849,29 @@ class App(tk.Tk):
 
         self._water = WaterReminder(lambda: self.cfg)
 
-        if self.cfg.get("primera_vez", True):
+        # Si no está instalado, mostrar instalador primero
+        if not _is_installed():
+            self.withdraw()
+            InstallerWindow(self, self._after_install)
+        elif self.cfg.get("primera_vez", True):
             self.withdraw()
             WelcomeWindow(self, self.cfg, self._after_welcome)
         else:
             self._start_main()
+
+    def _after_install(self):
+        """Callback tras instalación exitosa: recargar rutas y arrancar."""
+        global APP_DIR, CONFIG_FILE, STATS_FILE, HIST_FILE
+        APP_DIR     = _get_app_dir()
+        CONFIG_FILE = os.path.join(APP_DIR, "config.json")
+        STATS_FILE  = os.path.join(APP_DIR, "stats.json")
+        HIST_FILE   = os.path.join(APP_DIR, "historial.csv")
+        self.cfg    = load_config()
+        self.stats  = load_stats()
+        self.remaining  = self.cfg["intervalo_min"] * 60
+        self._total_sec = self.remaining
+        self.withdraw()
+        WelcomeWindow(self, self.cfg, self._after_welcome)
 
     def _after_welcome(self, cfg_updated):
         self.cfg        = cfg_updated
@@ -868,6 +903,7 @@ class App(tk.Tk):
             pystray.MenuItem("Estadisticas",    lambda i, it: self.after(0, self._open_stats)),
             pystray.MenuItem("Configuracion",   lambda i, it: self.after(0, self._open_config)),
             pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Desinstalar",     lambda i, it: self.after(0, self._open_uninstall)),
             pystray.MenuItem("Salir", self._quit),
         )
         self._tray = pystray.Icon("PausasActivas", make_tray_icon(TRAY_ACTIVE), "Pausas Activas", menu)
@@ -1106,6 +1142,404 @@ class App(tk.Tk):
 
     def _open_stats(self):
         StatsWindow(self, self.stats, self.cfg["meta_pausas"])
+
+    def _open_uninstall(self):
+        UninstallWindow(self, self._quit)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Ventana de instalación (se muestra la primera vez que se ejecuta el .exe)
+# ══════════════════════════════════════════════════════════════════════════════
+class InstallerWindow(tk.Toplevel):
+    def __init__(self, parent, on_finish):
+        super().__init__(parent)
+        self.on_finish = on_finish
+        self.title("Instalar Pausas Activas")
+        self.configure(bg=BG)
+        self.resizable(False, False)
+        self.attributes("-topmost", True)
+        self._install_dir = tk.StringVar(value=PROGRAMS_DIR)
+        self._build()
+        self._center()
+        self.protocol("WM_DELETE_WINDOW", self._cancelar)
+
+    def _build(self):
+        tk.Label(self, text="⚡", font=("Segoe UI Emoji", 40), bg=BG).pack(pady=(28, 4))
+        tk.Label(self, text="Instalar Pausas Activas",
+                 font=("Segoe UI", 15, "bold"), bg=BG, fg=ACCENT).pack()
+        tk.Label(self, text="Configura la instalación y haz clic en Instalar.",
+                 font=("Segoe UI", 9), bg=BG, fg=TEXT_DIM).pack(pady=(4, 18))
+
+        # Carpeta destino
+        dir_frame = tk.Frame(self, bg=BG2, highlightthickness=1, highlightbackground=BORDER)
+        dir_frame.pack(padx=28, fill="x")
+        tk.Label(dir_frame, text="Carpeta de instalación:", font=("Segoe UI", 9, "bold"),
+                 bg=BG2, fg=TEXT_DIM).pack(anchor="w", padx=12, pady=(10, 2))
+        tk.Entry(dir_frame, textvariable=self._install_dir, font=("Segoe UI", 9),
+                 bg=BG3, fg=TEXT, insertbackground=TEXT, relief="flat", bd=0,
+                 highlightthickness=1, highlightbackground=BORDER, width=46).pack(
+                     padx=12, pady=(0, 10), fill="x")
+
+        # Opciones
+        opt_frame = tk.Frame(self, bg=BG2, highlightthickness=1, highlightbackground=BORDER)
+        opt_frame.pack(padx=28, fill="x", pady=14)
+        tk.Label(opt_frame, text="Opciones:", font=("Segoe UI", 9, "bold"),
+                 bg=BG2, fg=TEXT_DIM).pack(anchor="w", padx=12, pady=(10, 2))
+        self.v_escritorio = tk.BooleanVar(value=True)
+        self.v_inicio     = tk.BooleanVar(value=True)
+        self.v_autostart  = tk.BooleanVar(value=True)
+        for var, txt in [
+            (self.v_escritorio, "  Crear acceso directo en el Escritorio"),
+            (self.v_inicio,     "  Agregar al Menú Inicio"),
+            (self.v_autostart,  "  Iniciar automáticamente con Windows"),
+        ]:
+            tk.Checkbutton(opt_frame, text=txt, variable=var, font=("Segoe UI", 9),
+                           bg=BG2, fg=TEXT, selectcolor=BG3,
+                           activebackground=BG2, activeforeground=TEXT).pack(anchor="w", padx=10, pady=4)
+        tk.Frame(opt_frame, bg=BG2).pack(pady=4)
+
+        # Progreso
+        self.pb = ttk.Progressbar(self, orient="horizontal", length=380,
+                                  mode="determinate", maximum=100, value=0)
+        s = ttk.Style(self); s.theme_use("default")
+        s.configure("inst.Horizontal.TProgressbar", troughcolor=BG3, background=ACCENT,
+                    bordercolor=BG3, lightcolor=ACCENT, darkcolor=ACCENT)
+        self.pb.configure(style="inst.Horizontal.TProgressbar")
+        self.pb.pack(padx=28, pady=(0, 4))
+        self.pb.pack_forget()
+        self.lbl_estado = tk.Label(self, text="", font=("Segoe UI", 9), bg=BG, fg=TEXT_DIM)
+        self.lbl_estado.pack()
+
+        # Botones
+        bf = tk.Frame(self, bg=BG); bf.pack(pady=(12, 24))
+        tk.Button(bf, text="Cancelar", font=("Segoe UI", 10), bg=BG3, fg=TEXT,
+                  bd=0, cursor="hand2", activebackground=BORDER, activeforeground=TEXT,
+                  relief="flat", padx=18, pady=8, command=self._cancelar).pack(side="left", padx=6)
+        self.btn = tk.Button(bf, text="Instalar  →", font=("Segoe UI", 10, "bold"),
+                  bg=ACCENT, fg="white", bd=0, cursor="hand2",
+                  activebackground="#5A52D5", activeforeground="white",
+                  relief="flat", padx=24, pady=8, command=self._instalar)
+        self.btn.pack(side="left", padx=6)
+
+    def _progress(self, pct, msg):
+        self.pb["value"] = pct
+        self.lbl_estado.config(text=msg)
+        self.update()
+
+    def _cancelar(self):
+        import tkinter.messagebox as mb
+        if mb.askyesno("Cancelar instalación",
+                       "¿Seguro que deseas cancelar?\nLa app se cerrará.",
+                       parent=self):
+            self.master.destroy()
+
+    def _instalar(self):
+        import shutil, subprocess
+        import tkinter.messagebox as mb
+
+        install_dir = self._install_dir.get().strip()
+        if not install_dir:
+            mb.showerror("Error", "Indica una carpeta de instalación.", parent=self); return
+
+        self.btn.config(state="disabled")
+        self.pb.pack(padx=28, pady=(0, 4))
+        errores = []
+
+        try:
+            # 1. Crear carpeta
+            self._progress(10, "Creando carpeta de instalación...")
+            os.makedirs(install_dir, exist_ok=True)
+
+            # 2. Copiar el propio exe a la carpeta destino
+            self._progress(25, "Copiando archivos...")
+            dest_exe = os.path.join(install_dir, os.path.basename(APP_PATH))
+            if os.path.abspath(APP_PATH) != os.path.abspath(dest_exe):
+                shutil.copy2(APP_PATH, dest_exe)
+
+            # Copiar ícono si está junto al exe
+            src_ico = os.path.join(os.path.dirname(APP_PATH), "PausasActivas.ico")
+            dest_ico = os.path.join(install_dir, "PausasActivas.ico")
+            if os.path.exists(src_ico) and os.path.abspath(src_ico) != os.path.abspath(dest_ico):
+                shutil.copy2(src_ico, dest_ico)
+
+            # 3. Acceso directo escritorio
+            if self.v_escritorio.get():
+                self._progress(45, "Creando acceso directo en el escritorio...")
+                import ctypes
+                buf = ctypes.create_unicode_buffer(260)
+                ctypes.windll.shell32.SHGetFolderPathW(0, 0x10, 0, 0, buf)
+                lnk = os.path.join(buf.value, "Pausas Activas.lnk")
+                _crear_acceso_directo(dest_exe, lnk,
+                                     dest_ico if os.path.exists(dest_ico) else "")
+
+            # 4. Menú Inicio
+            if self.v_inicio.get():
+                self._progress(60, "Agregando al Menú Inicio...")
+                import ctypes
+                buf = ctypes.create_unicode_buffer(260)
+                ctypes.windll.shell32.SHGetFolderPathW(0, 0x02, 0, 0, buf)
+                carpeta_inicio = os.path.join(buf.value, APP_DISPLAY)
+                os.makedirs(carpeta_inicio, exist_ok=True)
+                lnk = os.path.join(carpeta_inicio, "Pausas Activas.lnk")
+                _crear_acceso_directo(dest_exe, lnk,
+                                     dest_ico if os.path.exists(dest_ico) else "")
+
+            # 5. Autoarranque
+            if self.v_autostart.get():
+                self._progress(75, "Configurando autoarranque...")
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                     r"Software\Microsoft\Windows\CurrentVersion\Run",
+                                     0, winreg.KEY_SET_VALUE)
+                winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, f'"{dest_exe}"')
+                winreg.CloseKey(key)
+
+            # 6. Registro desinstalador
+            self._progress(90, "Registrando en el sistema...")
+            _registrar_instalacion(install_dir, dest_exe,
+                                   dest_ico if os.path.exists(dest_ico) else "")
+
+            self._progress(100, "¡Instalación completa!")
+            mb.showinfo("¡Listo!", f"Pausas Activas se instaló en:\n{install_dir}", parent=self)
+            self.destroy()
+            self.on_finish()
+
+        except PermissionError:
+            mb.showerror("Error de permisos",
+                         f"No se pudo escribir en:\n{install_dir}\n\n"
+                         "Intenta ejecutar como Administrador.", parent=self)
+            self.btn.config(state="normal")
+            self.pb.pack_forget()
+            self.lbl_estado.config(text="")
+        except Exception as e:
+            mb.showerror("Error", str(e), parent=self)
+            self.btn.config(state="normal")
+            self.pb.pack_forget()
+            self.lbl_estado.config(text="")
+
+    def _center(self):
+        self.update_idletasks()
+        w, h = self.winfo_width(), self.winfo_height()
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        self.geometry(f"+{(sw - w) // 2}+{(sh - h) // 2}")
+
+
+def _crear_acceso_directo(target, lnk_path, icon=""):
+    import subprocess
+    ps = (
+        f'$ws = New-Object -ComObject WScript.Shell; '
+        f'$s  = $ws.CreateShortcut("{lnk_path}"); '
+        f'$s.TargetPath = "{target}"; '
+        f'$s.WorkingDirectory = "{os.path.dirname(target)}"; '
+    )
+    if icon:
+        ps += f'$s.IconLocation = "{icon}"; '
+    ps += '$s.Save()'
+    import subprocess
+    subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+                   capture_output=True, creationflags=0x08000000)
+
+
+def _registrar_instalacion(install_dir, exe_path, icon_path=""):
+    key_path = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\PausasActivas"
+    key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path)
+    winreg.SetValueEx(key, "DisplayName",     0, winreg.REG_SZ, APP_DISPLAY)
+    winreg.SetValueEx(key, "UninstallString", 0, winreg.REG_SZ, f'"{exe_path}" --uninstall')
+    winreg.SetValueEx(key, "DisplayIcon",     0, winreg.REG_SZ, icon_path or exe_path)
+    winreg.SetValueEx(key, "Publisher",       0, winreg.REG_SZ, APP_DISPLAY)
+    winreg.SetValueEx(key, "InstallLocation", 0, winreg.REG_SZ, install_dir)
+    winreg.SetValueEx(key, "NoModify",        0, winreg.REG_DWORD, 1)
+    winreg.SetValueEx(key, "NoRepair",        0, winreg.REG_DWORD, 1)
+    winreg.CloseKey(key)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Ventana de desinstalación
+# ══════════════════════════════════════════════════════════════════════════════
+class UninstallWindow(tk.Toplevel):
+    def __init__(self, parent, on_quit):
+        super().__init__(parent)
+        self.on_quit = on_quit
+        self.title("Desinstalar Pausas Activas")
+        self.configure(bg=BG)
+        self.resizable(False, False)
+        self.attributes("-topmost", True)
+        self._build()
+        self._center()
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
+
+    def _build(self):
+        # ── Encabezado ────────────────────────────────────────────────────────
+        tk.Label(self, text="🗑️", font=("Segoe UI Emoji", 40), bg=BG).pack(pady=(28, 4))
+        tk.Label(self, text="Desinstalar Pausas Activas",
+                 font=("Segoe UI", 14, "bold"), bg=BG, fg=ACCENT2).pack()
+        tk.Label(self, text="Esta acción eliminará la configuración de la app\ny no puede deshacerse.",
+                 font=("Segoe UI", 9), bg=BG, fg=TEXT_DIM, justify="center").pack(pady=(4, 16))
+
+        # ── Opciones ──────────────────────────────────────────────────────────
+        box = tk.Frame(self, bg=BG2, highlightthickness=1, highlightbackground=BORDER)
+        box.pack(padx=28, fill="x", pady=(0, 16))
+
+        self.v_autoarranque = tk.BooleanVar(value=True)
+        self.v_datos        = tk.BooleanVar(value=True)
+        self.v_accesos      = tk.BooleanVar(value=True)
+        self.v_carpeta      = tk.BooleanVar(value=True)
+
+        opciones = [
+            (self.v_autoarranque, "Quitar del autoarranque de Windows"),
+            (self.v_datos,        "Eliminar configuración, estadísticas e historial"),
+            (self.v_accesos,      "Eliminar accesos directos (escritorio / menú Inicio)"),
+            (self.v_carpeta,      "Eliminar carpeta de instalación y archivos"),
+        ]
+        for var, texto in opciones:
+            tk.Checkbutton(box, text=f"  {texto}", variable=var,
+                           font=("Segoe UI", 9), bg=BG2, fg=TEXT,
+                           selectcolor=BG3, activebackground=BG2,
+                           activeforeground=TEXT).pack(anchor="w", padx=10, pady=5)
+
+        # ── Botones ───────────────────────────────────────────────────────────
+        self.lbl_estado = tk.Label(self, text="", font=("Segoe UI", 9), bg=BG, fg=TEXT_DIM)
+        self.lbl_estado.pack(pady=(0, 4))
+
+        bf = tk.Frame(self, bg=BG)
+        bf.pack(pady=(0, 24))
+        tk.Button(bf, text="Cancelar", font=("Segoe UI", 10), bg=BG3, fg=TEXT,
+                  bd=0, cursor="hand2", activebackground=BORDER, activeforeground=TEXT,
+                  relief="flat", padx=18, pady=8, command=self.destroy).pack(side="left", padx=6)
+        tk.Button(bf, text="Desinstalar", font=("Segoe UI", 10, "bold"),
+                  bg=ACCENT2, fg="white", bd=0, cursor="hand2",
+                  activebackground="#d94f6a", activeforeground="white",
+                  relief="flat", padx=18, pady=8, command=self._confirmar).pack(side="left", padx=6)
+
+    def _confirmar(self):
+        import tkinter.messagebox as mb
+        ok = mb.askyesno(
+            "Confirmar desinstalación",
+            "¿Seguro que deseas desinstalar Pausas Activas?\n\nLa aplicación se cerrará al terminar.",
+            icon="warning",
+            parent=self,
+        )
+        if not ok:
+            return
+        self._ejecutar()
+
+    def _ejecutar(self):
+        import tkinter.messagebox as mb
+        errores = []
+
+        # 1. Autoarranque
+        if self.v_autoarranque.get():
+            self.lbl_estado.config(text="Quitando autoarranque...")
+            self.update()
+            try:
+                set_autoarranque(False)
+            except Exception as e:
+                errores.append(f"Autoarranque: {e}")
+
+        # 2. Archivos de datos
+        if self.v_datos.get():
+            self.lbl_estado.config(text="Eliminando datos...")
+            self.update()
+            for f in [CONFIG_FILE, STATS_FILE, HIST_FILE]:
+                try:
+                    if os.path.exists(f):
+                        os.remove(f)
+                except Exception as e:
+                    errores.append(f"Archivo {os.path.basename(f)}: {e}")
+
+        # 3. Accesos directos
+        if self.v_accesos.get():
+            self.lbl_estado.config(text="Eliminando accesos directos...")
+            self.update()
+            _eliminar_accesos_directos(errores)
+
+        # 4. Entrada en "Agregar o quitar programas" y registro
+        try:
+            _quitar_registro_desinstalador()
+        except Exception:
+            pass
+
+        # 5. Borrar carpeta de instalación (programa en diferido para que el exe pueda cerrarse)
+        if self.v_carpeta.get():
+            install_dir = _get_install_dir_from_registry() or APP_DIR
+            if install_dir and os.path.isdir(install_dir):
+                _programar_borrado_carpeta(install_dir)
+
+        if errores:
+            mb.showwarning(
+                "Desinstalación con advertencias",
+                "Se completó con algunos errores:\n\n" + "\n".join(errores),
+                parent=self,
+            )
+        else:
+            mb.showinfo(
+                "Desinstalación completa",
+                "Pausas Activas ha sido desinstalado correctamente.",
+                parent=self,
+            )
+
+        self.destroy()
+        self.on_quit()
+
+    def _center(self):
+        self.update_idletasks()
+        w, h = self.winfo_width(), self.winfo_height()
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        self.geometry(f"+{(sw - w) // 2}+{(sh - h) // 2}")
+
+
+# ── Helpers de desinstalación ─────────────────────────────────────────────────
+def _eliminar_accesos_directos(errores):
+    """Borra accesos directos del escritorio y del menú Inicio si existen."""
+    lugares = []
+    try:
+        import ctypes
+        buf = ctypes.create_unicode_buffer(260)
+        # CSIDL_DESKTOPDIRECTORY = 0x10, CSIDL_PROGRAMS = 0x02
+        for csidl in (0x10, 0x02):
+            if ctypes.windll.shell32.SHGetFolderPathW(0, csidl, 0, 0, buf) == 0:
+                lugares.append(buf.value)
+    except Exception:
+        pass
+    # Fallback con variables de entorno
+    for var in ("USERPROFILE", "PUBLIC"):
+        base = os.environ.get(var, "")
+        if base:
+            lugares.append(os.path.join(base, "Desktop"))
+            lugares.append(os.path.join(base, "AppData", "Roaming",
+                                        "Microsoft", "Windows", "Start Menu", "Programs"))
+
+    for carpeta in lugares:
+        for nombre in ("Pausas Activas.lnk", "PausasActivas.lnk"):
+            ruta = os.path.join(carpeta, nombre)
+            try:
+                if os.path.exists(ruta):
+                    os.remove(ruta)
+            except Exception as e:
+                errores.append(f"Acceso directo {nombre}: {e}")
+
+
+def _programar_borrado_carpeta(folder):
+    """Crea un .bat que borra la carpeta después de que el proceso termine."""
+    import tempfile, subprocess
+    pid = os.getpid()
+    bat = os.path.join(tempfile.gettempdir(), "pa_cleanup.bat")
+    with open(bat, "w") as f:
+        f.write("@echo off\n")
+        f.write(":loop\n")
+        f.write(f'tasklist /fi "PID eq {pid}" | find "{pid}" >nul 2>&1\n')
+        f.write("if not errorlevel 1 ( timeout /t 1 /nobreak >nul && goto loop )\n")
+        f.write(f'rd /s /q "{folder}" >nul 2>&1\n')
+        f.write('del "%~f0"\n')
+    subprocess.Popen(["cmd", "/c", bat], creationflags=0x08000000)
+
+
+def _quitar_registro_desinstalador():
+    """Elimina la entrada de 'Agregar o quitar programas' si existe."""
+    try:
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\PausasActivas"
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, key_path)
+    except FileNotFoundError:
+        pass
 
 
 if __name__ == "__main__":
