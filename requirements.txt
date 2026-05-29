@@ -1,0 +1,5 @@
+# Pausas Activas - dependencias
+# Solo necesita la librería estándar de Python (tkinter incluido)
+# Para empaquetar como .exe en Windows:
+#   pip install pyinstaller
+#   pyinstaller --onefile --windowed --name "PausasActivas" pausa_activa.py
