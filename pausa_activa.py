@@ -11,12 +11,23 @@ try:
 except ImportError:
     TRAY_AVAILABLE = False
 
-APP_DIR     = os.path.dirname(os.path.abspath(__file__))
+import sys
+
+def _get_app_dir():
+    """Devuelve la carpeta donde corre la app, tanto en .py como en .exe (PyInstaller)."""
+    if getattr(sys, "frozen", False):
+        # Corriendo como .exe compilado con PyInstaller
+        return os.path.dirname(sys.executable)
+    else:
+        # Corriendo como script .py normal
+        return os.path.dirname(os.path.abspath(__file__))
+
+APP_DIR     = _get_app_dir()
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
 STATS_FILE  = os.path.join(APP_DIR, "stats.json")
 HIST_FILE   = os.path.join(APP_DIR, "historial.csv")
 APP_NAME    = "PausasActivas"
-APP_PATH    = os.path.abspath(__file__)
+APP_PATH    = sys.executable if getattr(sys, "frozen", False) else os.path.abspath(__file__)
 
 DEFAULT_CONFIG = {
     "intervalo_min": 45,
@@ -34,6 +45,7 @@ DEFAULT_CONFIG = {
     "agua_min": 30,               # cada cuántos minutos
     "fin_de_semana": False,       # pausar sábado y domingo
     "sonido_ambiente": "ninguno", # lluvia | naturaleza | ninguno
+    "primera_vez": True,          # mostrar bienvenida al iniciar por primera vez
 }
 
 EJERCICIOS = [
@@ -239,7 +251,10 @@ def set_autoarranque(enable):
                          0, winreg.KEY_SET_VALUE)
     try:
         if enable:
-            winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, f'python "{APP_PATH}"')
+            if getattr(sys, "frozen", False):
+                winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, f'"{APP_PATH}"')
+            else:
+                winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, f'python "{APP_PATH}"')
         else:
             try: winreg.DeleteValue(key, APP_NAME)
             except FileNotFoundError: pass
@@ -570,6 +585,229 @@ class ConfigWindow(tk.Toplevel):
 # ══════════════════════════════════════════════════════════════════════════════
 # App principal
 # ══════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
+# Ventana de bienvenida (se muestra solo la primera vez)
+# ══════════════════════════════════════════════════════════════════════════════
+class WelcomeWindow(tk.Toplevel):
+    def __init__(self, parent, cfg, on_finish):
+        super().__init__(parent)
+        self.cfg       = dict(cfg)
+        self.on_finish = on_finish
+        self.step      = 0
+        self.title("Bienvenido a Pausas Activas")
+        self.configure(bg=BG)
+        self.resizable(False, False)
+        self.attributes("-topmost", True)
+        self.protocol("WM_DELETE_WINDOW", self._finish)
+        self._build()
+        self._center()
+
+    def _center(self):
+        self.update_idletasks()
+        w, h = self.winfo_width(), self.winfo_height()
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        self.geometry(f"+{(sw - w) // 2}+{(sh - h) // 2}")
+
+    def _build(self):
+        self._frame = tk.Frame(self, bg=BG)
+        self._frame.pack(fill="both", expand=True)
+        self._show_step()
+
+    def _clear(self):
+        for w in self._frame.winfo_children():
+            w.destroy()
+
+    def _show_step(self):
+        self._clear()
+        if self.step == 0:
+            self._step_bienvenida()
+        elif self.step == 1:
+            self._step_config()
+        elif self.step == 2:
+            self._step_listo()
+
+    # ── Indicador de pasos ────────────────────────────────────────────────────
+    def _dots(self, parent):
+        f = tk.Frame(parent, bg=BG)
+        f.pack(pady=(0, 16))
+        for i in range(3):
+            color = ACCENT if i == self.step else BG3
+            tk.Label(f, text="●", font=("Segoe UI", 10), bg=BG,
+                     fg=color).pack(side="left", padx=3)
+
+    # ── PASO 1: Bienvenida ────────────────────────────────────────────────────
+    def _step_bienvenida(self):
+        f = self._frame
+        tk.Label(f, text="👋", font=("Segoe UI Emoji", 48), bg=BG).pack(pady=(32, 4))
+        tk.Label(f, text="¡Bienvenido a Pausas Activas!", font=("Segoe UI", 16, "bold"),
+                 bg=BG, fg=TEXT).pack()
+        tk.Label(f, text="Tu asistente de bienestar en el trabajo",
+                 font=("Segoe UI", 10), bg=BG, fg=TEXT_DIM).pack(pady=(4, 20))
+
+        cards = [
+            ("⏱", "Recordatorios automáticos", "Te avisa cada cierto tiempo para que hagas una pausa activa."),
+            ("🏃", "Ejercicios guiados",        "Cuello, espalda, ojos, respiración y más."),
+            ("💧", "Hidratación",               "Recordatorios para que tomes agua regularmente."),
+            ("📊", "Estadísticas",              "Lleva el registro de tus pausas y rachas diarias."),
+        ]
+        for ico, titulo, desc in cards:
+            row = tk.Frame(f, bg=BG2, highlightthickness=1, highlightbackground=BORDER)
+            row.pack(fill="x", padx=28, pady=4)
+            tk.Label(row, text=ico, font=("Segoe UI Emoji", 20), bg=BG2).pack(side="left", padx=(14, 8), pady=10)
+            col = tk.Frame(row, bg=BG2)
+            col.pack(side="left", pady=8)
+            tk.Label(col, text=titulo, font=("Segoe UI", 10, "bold"), bg=BG2, fg=TEXT, anchor="w").pack(anchor="w")
+            tk.Label(col, text=desc, font=("Segoe UI", 9), bg=BG2, fg=TEXT_DIM, anchor="w", wraplength=280).pack(anchor="w")
+
+        self._dots(f)
+        tk.Button(f, text="Siguiente →", font=("Segoe UI", 10, "bold"),
+                  bg=ACCENT, fg="white", bd=0, cursor="hand2",
+                  activebackground="#5A52D5", activeforeground="white",
+                  relief="flat", padx=28, pady=8,
+                  command=self._next).pack(pady=(0, 28))
+
+    # ── PASO 2: Configuración ─────────────────────────────────────────────────
+    def _step_config(self):
+        f = self._frame
+        tk.Label(f, text="⚙️", font=("Segoe UI Emoji", 36), bg=BG).pack(pady=(28, 4))
+        tk.Label(f, text="Configura tu rutina", font=("Segoe UI", 15, "bold"),
+                 bg=BG, fg=TEXT).pack()
+        tk.Label(f, text="Puedes cambiar esto después en Configuración",
+                 font=("Segoe UI", 9), bg=BG, fg=TEXT_DIM).pack(pady=(2, 16))
+
+        frame = tk.Frame(f, bg=BG2, highlightthickness=1, highlightbackground=BORDER)
+        frame.pack(fill="x", padx=28, pady=(0, 8))
+
+        def campo(lbl, var, row):
+            tk.Label(frame, text=lbl, font=("Segoe UI", 10), bg=BG2,
+                     fg=TEXT_DIM, anchor="w").grid(row=row, column=0, sticky="w", padx=16, pady=8)
+            tk.Entry(frame, textvariable=var, font=("Segoe UI", 11), bg=BG3, fg=TEXT,
+                     insertbackground=TEXT, relief="flat", bd=0, width=10,
+                     highlightthickness=1, highlightbackground=BORDER,
+                     highlightcolor=ACCENT).grid(row=row, column=1, padx=16, pady=8, sticky="e")
+
+        self.v_int = tk.StringVar(value=str(self.cfg["intervalo_min"]))
+        self.v_dur = tk.StringVar(value=str(self.cfg["duracion_pausa_min"]))
+        self.v_ini = tk.StringVar(value=self.cfg["hora_inicio"])
+        self.v_fin = tk.StringVar(value=self.cfg["hora_fin"])
+        self.v_meta = tk.StringVar(value=str(self.cfg["meta_pausas"]))
+
+        campo("Intervalo entre pausas (min)", self.v_int,  0)
+        campo("Duración de la pausa (min)",   self.v_dur,  1)
+        campo("Hora inicio (HH:MM)",          self.v_ini,  2)
+        campo("Hora fin (HH:MM)",             self.v_fin,  3)
+        campo("Meta de pausas diarias",       self.v_meta, 4)
+
+        # Ejercicios
+        tk.Label(f, text="Ejercicios a incluir:", font=("Segoe UI", 9, "bold"),
+                 bg=BG, fg=TEXT_DIM).pack(anchor="w", padx=28, pady=(8, 4))
+        ef = tk.Frame(f, bg=BG2, highlightthickness=1, highlightbackground=BORDER)
+        ef.pack(fill="x", padx=28)
+        self.ej_vars = {}
+        activos = self.cfg.get("ejercicios_activos", [e["id"] for e in EJERCICIOS])
+        cols = 2
+        for i, ej in enumerate(EJERCICIOS):
+            v = tk.BooleanVar(value=ej["id"] in activos)
+            self.ej_vars[ej["id"]] = v
+            r, c = divmod(i, cols)
+            tk.Checkbutton(ef, text=f"{ej['icono']} {ej['nombre']}", variable=v,
+                           font=("Segoe UI", 9), bg=BG2, fg=TEXT, selectcolor=BG3,
+                           activebackground=BG2, activeforeground=TEXT).grid(
+                               row=r, column=c, sticky="w", padx=10, pady=3)
+
+        self.lbl_err = tk.Label(f, text="", font=("Segoe UI", 9), bg=BG, fg=ACCENT2)
+        self.lbl_err.pack()
+
+        self._dots(f)
+        bf = tk.Frame(f, bg=BG); bf.pack(pady=(0, 24))
+        tk.Button(bf, text="← Atrás", font=("Segoe UI", 10), bg=BG3, fg=TEXT,
+                  bd=0, cursor="hand2", activebackground=BORDER, activeforeground=TEXT,
+                  relief="flat", padx=16, pady=8, command=self._prev).pack(side="left", padx=6)
+        tk.Button(bf, text="Siguiente →", font=("Segoe UI", 10, "bold"),
+                  bg=ACCENT, fg="white", bd=0, cursor="hand2",
+                  activebackground="#5A52D5", activeforeground="white",
+                  relief="flat", padx=24, pady=8, command=self._save_and_next).pack(side="left", padx=6)
+
+    # ── PASO 3: Listo ─────────────────────────────────────────────────────────
+    def _step_listo(self):
+        f = self._frame
+        tk.Label(f, text="🎉", font=("Segoe UI Emoji", 52), bg=BG).pack(pady=(36, 8))
+        tk.Label(f, text="¡Todo listo!", font=("Segoe UI", 18, "bold"), bg=BG, fg=GREEN).pack()
+        tk.Label(f, text="La app ya está configurada y lista para cuidarte.",
+                 font=("Segoe UI", 10), bg=BG, fg=TEXT_DIM).pack(pady=(6, 24))
+
+        resumen = tk.Frame(f, bg=BG2, highlightthickness=1, highlightbackground=BORDER)
+        resumen.pack(fill="x", padx=32, pady=(0, 20))
+        items = [
+            ("⏱ Intervalo",  f"Cada {self.cfg['intervalo_min']} min"),
+            ("🕐 Duración",  f"{self.cfg['duracion_pausa_min']} min de pausa"),
+            ("🕗 Horario",   f"{self.cfg['hora_inicio']} a {self.cfg['hora_fin']}"),
+            ("🎯 Meta",      f"{self.cfg['meta_pausas']} pausas por día"),
+        ]
+        for lbl, val in items:
+            row = tk.Frame(resumen, bg=BG2); row.pack(fill="x", padx=16, pady=6)
+            tk.Label(row, text=lbl, font=("Segoe UI", 10), bg=BG2, fg=TEXT_DIM).pack(side="left")
+            tk.Label(row, text=val, font=("Segoe UI", 10, "bold"), bg=BG2, fg=TEXT).pack(side="right")
+
+        tk.Label(f, text="La app se minimizará a la bandeja del sistema.",
+                 font=("Segoe UI", 9), bg=BG, fg=TEXT_DIM).pack(pady=(0, 8))
+
+        self._dots(f)
+        tk.Button(f, text="¡Empezar! 🚀", font=("Segoe UI", 11, "bold"),
+                  bg=GREEN, fg="#0F1117", bd=0, cursor="hand2",
+                  activebackground="#35C49A", activeforeground="#0F1117",
+                  relief="flat", padx=32, pady=10,
+                  command=self._finish).pack(pady=(0, 32))
+
+    # ── Navegación ────────────────────────────────────────────────────────────
+    def _next(self):
+        self.step += 1
+        self._show_step()
+        self._center()
+
+    def _prev(self):
+        self.step -= 1
+        self._show_step()
+        self._center()
+
+    def _save_and_next(self):
+        try:
+            iv  = int(self.v_int.get());  dv  = int(self.v_dur.get())
+            mv  = int(self.v_meta.get())
+            assert iv > 0 and dv > 0 and mv > 0
+            h0, m0 = map(int, self.v_ini.get().split(":"))
+            h1, m1 = map(int, self.v_fin.get().split(":"))
+            assert 0 <= h0 < 24 and 0 <= m0 < 60
+            assert 0 <= h1 < 24 and 0 <= m1 < 60
+            assert (h1, m1) > (h0, m0), "Hora fin debe ser mayor que hora inicio"
+        except AssertionError as e:
+            self.lbl_err.config(text=f"Error: {e}" if str(e) else "Revisa los valores"); return
+        except Exception:
+            self.lbl_err.config(text="Revisa los valores ingresados"); return
+
+        activos = [eid for eid, v in self.ej_vars.items() if v.get()]
+        if not activos:
+            self.lbl_err.config(text="Selecciona al menos un ejercicio"); return
+
+        self.cfg.update({
+            "intervalo_min":      iv,
+            "duracion_pausa_min": dv,
+            "hora_inicio":        self.v_ini.get(),
+            "hora_fin":           self.v_fin.get(),
+            "meta_pausas":        mv,
+            "ejercicios_activos": activos,
+            "primera_vez":        False,
+        })
+        save_config(self.cfg)
+        self._next()
+
+    def _finish(self):
+        self.cfg["primera_vez"] = False
+        save_config(self.cfg)
+        self.destroy()
+        self.on_finish(self.cfg)
+
+
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -587,13 +825,32 @@ class App(tk.Tk):
         self.title("Pausas Activas")
         self.configure(bg=BG)
         self.resizable(False, False)
+        try:
+            self.iconbitmap(os.path.join(APP_DIR, "PausasActivas.ico"))
+        except Exception:
+            pass
+
+        self._water = WaterReminder(lambda: self.cfg)
+
+        if self.cfg.get("primera_vez", True):
+            self.withdraw()
+            WelcomeWindow(self, self.cfg, self._after_welcome)
+        else:
+            self._start_main()
+
+    def _after_welcome(self, cfg_updated):
+        self.cfg        = cfg_updated
+        self.remaining  = self.cfg["intervalo_min"] * 60
+        self._total_sec = self.remaining
+        self._start_main()
+
+    def _start_main(self):
         self._build()
         self._center()
+        self.deiconify()
         self._tick()
         self.protocol("WM_DELETE_WINDOW", self._hide)
 
-        # Recordatorio de agua
-        self._water = WaterReminder(lambda: self.cfg)
         if self.cfg.get("agua_activo", True):
             self._water.start()
 

@@ -1,12 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-
 a = Analysis(
     ['pausa_activa.py'],
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=[],
+    hiddenimports=[
+        'winotify',
+        'pystray',
+        'PIL',
+        'PIL.Image',
+        'PIL.ImageDraw',
+        'winreg',
+        'winsound',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -35,5 +42,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['icono.ico'],
+    icon=['PausasActivas.ico'],
 )
