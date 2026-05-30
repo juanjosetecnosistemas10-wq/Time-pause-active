@@ -6,7 +6,6 @@ node_modules/
 gym-apk/
 
 # Builds
-dist/
 build/
 *.exe
 
