@@ -21,5 +21,6 @@
   "agua_activo": true,
   "agua_min": 30,
   "fin_de_semana": true,
-  "sonido_ambiente": "lluvia"
+  "sonido_ambiente": "lluvia",
+  "primera_vez": false
 }

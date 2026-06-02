@@ -13,6 +13,8 @@ a = Analysis(
         'PIL.ImageDraw',
         'winreg',
         'winsound',
+        'logging',
+        'wave',
     ],
     hookspath=[],
     hooksconfig={},

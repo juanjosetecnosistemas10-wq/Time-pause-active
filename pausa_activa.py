@@ -2,7 +2,11 @@
 from tkinter import ttk
 import json, os, random, threading, time, winsound, csv, winreg
 from datetime import datetime, time as dtime
-from winotify import Notification, audio
+try:
+    from winotify import Notification, audio
+    WINOTIFY_AVAILABLE = True
+except ImportError:
+    WINOTIFY_AVAILABLE = False
 
 try:
     import pystray
@@ -12,8 +16,16 @@ except ImportError:
     TRAY_AVAILABLE = False
 
 import sys
+import logging
 
 APP_NAME    = "PausasActivas"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(APP_NAME)
 APP_DISPLAY = "Pausas Activas"
 APP_PATH    = sys.executable if getattr(sys, "frozen", False) else os.path.abspath(__file__)
 INSTALL_DIR_REG = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\PausasActivas"
@@ -45,6 +57,8 @@ APP_DIR     = _get_app_dir()
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
 STATS_FILE  = os.path.join(APP_DIR, "stats.json")
 HIST_FILE   = os.path.join(APP_DIR, "historial.csv")
+
+log.info("APP_DIR=%s, frozen=%s", APP_DIR, getattr(sys, "frozen", False))
 
 DEFAULT_CONFIG = {
     "intervalo_min": 45,
@@ -112,42 +126,81 @@ def is_fullscreen_app_running():
         return False
 
 # ══════════════════════════════════════════════════════════════════════════════
-# MEJORA 2 — Sonidos ambiente (lluvia / naturaleza) generados con winsound
+# MEJORA 2 — Sonidos ambiente (lluvia / naturaleza) con archivos WAV reales
 # ══════════════════════════════════════════════════════════════════════════════
 _ambient_stop = threading.Event()
+_ambient_dir  = os.path.join(os.environ.get("TEMP", os.path.expanduser("~")), ".pausas_activas_audio")
 
-def _play_rain(stop_event):
-    """Simula lluvia con tonos aleatorios suaves."""
-    freqs = [200, 220, 240, 260, 180, 210]
-    while not stop_event.is_set():
-        try:
-            winsound.Beep(random.choice(freqs), random.randint(60, 150))
-            time.sleep(random.uniform(0.05, 0.2))
-        except Exception:
-            break
+def _generar_wav_lluvia(path, duracion_seg=30):
+    """Genera un archivo WAV de sonido de lluvia (ruido blanco filtrado)."""
+    import wave, struct, math
+    sample_rate = 22050
+    n_samples   = sample_rate * duracion_seg
+    with wave.open(path, "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        for i in range(n_samples):
+            # Ruido blanco con envelope suave
+            t = i / sample_rate
+            envelope = 0.5 + 0.5 * math.sin(math.pi * t / duracion_seg)  # fade in/out
+            ruido = random.uniform(-1, 1)
+            # Filtro pasa-bajos simple (promedio móvil)
+            sample = int(ruido * 12000 * envelope)
+            sample = max(-32768, min(32767, sample))
+            wf.writeframes(struct.pack("<h", sample))
 
-def _play_nature(stop_event):
-    """Simula sonidos de naturaleza (pajaros, viento)."""
-    freqs = [800, 900, 1000, 750, 850, 600, 1100]
-    while not stop_event.is_set():
-        try:
-            winsound.Beep(random.choice(freqs), random.randint(80, 200))
-            time.sleep(random.uniform(0.3, 1.0))
-        except Exception:
-            break
+def _generar_wav_naturaleza(path, duracion_seg=30):
+    """Genera un archivo WAV de naturaleza (tonos suaves + ruido de viento)."""
+    import wave, struct, math
+    sample_rate = 22050
+    n_samples   = sample_rate * duracion_seg
+    with wave.open(path, "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        for i in range(n_samples):
+            t = i / sample_rate
+            envelope = 0.5 + 0.5 * math.sin(math.pi * t / duracion_seg)
+            # Viento (ruido filtrado)
+            viento = random.uniform(-0.3, 0.3) * envelope
+            # Pájaros (tonos suaves modulados)
+            pajaro = 0
+            for freq in [400, 550, 700, 850, 1000]:
+                pajaro += 0.08 * math.sin(2 * math.pi * freq * t)
+                pajaro += 0.04 * math.sin(2 * math.pi * freq * 1.5 * t + 1.3)
+            sample = int((viento + pajaro * 0.5) * 10000)
+            sample = max(-32768, min(32767, sample))
+            wf.writeframes(struct.pack("<h", sample))
+
+def _get_ambient_wav(tipo):
+    """Devuelve la ruta al WAV generado (lo crea si no existe)."""
+    os.makedirs(_ambient_dir, exist_ok=True)
+    path = os.path.join(_ambient_dir, f"{tipo}.wav")
+    if not os.path.exists(path):
+        if tipo == "lluvia":
+            _generar_wav_lluvia(path)
+        elif tipo == "naturaleza":
+            _generar_wav_naturaleza(path)
+    return path
 
 def start_ambient(tipo):
     global _ambient_stop
-    _ambient_stop.set()
-    time.sleep(0.1)
+    stop_ambient()
     _ambient_stop = threading.Event()
-    if tipo == "lluvia":
-        threading.Thread(target=_play_rain, args=(_ambient_stop,), daemon=True).start()
-    elif tipo == "naturaleza":
-        threading.Thread(target=_play_nature, args=(_ambient_stop,), daemon=True).start()
+    if tipo == "ninguno":
+        return
+    try:
+        path = _get_ambient_wav(tipo)
+        winsound.PlaySound(path, winsound.SND_ASYNC | winsound.SND_LOOP)
+    except Exception:
+        pass
 
 def stop_ambient():
-    _ambient_stop.set()
+    try:
+        winsound.PlaySound(None, winsound.SND_PURGE)
+    except Exception:
+        pass
 
 # ══════════════════════════════════════════════════════════════════════════════
 # MEJORA 3 — Recordatorio de agua
@@ -248,10 +301,11 @@ def fmt_time(s):
     return f"{m:02d}:{s:02d}"
 
 def play_alert():
+    """Reproduce un tono de alerta ascendente más agradable."""
     try:
-        for freq, dur in [(880, 120), (0, 60), (1100, 180)]:
-            if freq: winsound.Beep(freq, dur)
-            else: time.sleep(dur / 1000)
+        for freq in [660, 880, 1100]:
+            winsound.Beep(freq, 100)
+            time.sleep(0.05)
     except Exception:
         pass
 
@@ -290,10 +344,18 @@ def get_autoarranque():
         return False
 
 def send_win_notification(title, msg):
+    if WINOTIFY_AVAILABLE:
+        try:
+            toast = Notification(app_id=APP_NAME, title=title, msg=msg, duration="short")
+            toast.set_audio(audio.Default, loop=False)
+            toast.show()
+            return
+        except Exception:
+            pass
+    # Fallback: notificación Windows nativa vía ctypes
     try:
-        toast = Notification(app_id=APP_NAME, title=title, msg=msg, duration="short")
-        toast.set_audio(audio.Default, loop=False)
-        toast.show()
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(0, msg, title, 0x40 | 0x1000)
     except Exception:
         pass
 
@@ -848,6 +910,8 @@ class App(tk.Tk):
             pass
 
         self._water = WaterReminder(lambda: self.cfg)
+        log.info("App iniciada. running=%s, instalada=%s, primera_vez=%s",
+                 self.running, _is_installed(), self.cfg.get("primera_vez", True))
 
         # Si no está instalado, mostrar instalador primero
         if not _is_installed():
@@ -1055,6 +1119,7 @@ class App(tk.Tk):
     def _trigger_pausa(self):
         if self.pausa_open: return
         self.pausa_open = True
+        log.info("Pausa activada, ejercicio=%s", self._last_ej or "aleatorio")
         self._show()
         if self.cfg.get("sonido", True):
             threading.Thread(target=play_alert, daemon=True).start()
@@ -1324,7 +1389,6 @@ class InstallerWindow(tk.Toplevel):
 
 
 def _crear_acceso_directo(target, lnk_path, icon=""):
-    import subprocess
     ps = (
         f'$ws = New-Object -ComObject WScript.Shell; '
         f'$s  = $ws.CreateShortcut("{lnk_path}"); '
@@ -1334,7 +1398,6 @@ def _crear_acceso_directo(target, lnk_path, icon=""):
     if icon:
         ps += f'$s.IconLocation = "{icon}"; '
     ps += '$s.Save()'
-    import subprocess
     subprocess.run(["powershell", "-NoProfile", "-Command", ps],
                    capture_output=True, creationflags=0x08000000)
 
