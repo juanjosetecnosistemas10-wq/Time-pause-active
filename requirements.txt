@@ -1,9 +1,4 @@
-# Pausas Activas - dependencias
-# Instalar con: pip install -r requirements.txt
-winotify>=0.3
-pystray>=0.19
-Pillow>=10.0
-
-# Opcionales para empaquetar como .exe:
-#   pip install pyinstaller
-#   pyinstaller --onefile --windowed --name "PausasActivas" pausa_activa.py
+pystray==0.19.5
+Pillow==10.4.0
+winotify==1.2.0
+pytest==8.3.4

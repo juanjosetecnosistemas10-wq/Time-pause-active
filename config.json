@@ -22,5 +22,11 @@
   "agua_min": 30,
   "fin_de_semana": true,
   "sonido_ambiente": "lluvia",
-  "primera_vez": false
+  "primera_vez": false,
+  "tema": "oscuro",
+  "modo": "normal",
+  "perfil": "default",
+  "idioma": "es",
+  "notificacion_sonido": "default",
+  "notificacion_duracion": "short"
 }

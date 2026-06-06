@@ -1,0 +1,11 @@
+[
+  {"id": "cuello",  "nombre": "Estiramiento de cuello",  "icono": "🧘", "pasos": ["Inclina la cabeza a la derecha (10 seg)", "Inclina la cabeza a la izquierda (10 seg)", "Gira suavemente en circulos (3 veces)"]},
+  {"id": "hombros", "nombre": "Estiramiento de hombros", "icono": "💪", "pasos": ["Lleva el brazo derecho al pecho y sujetalo (10 seg)", "Repite con el brazo izquierdo", "Sube los hombros hasta las orejas y suelta (5 veces)"]},
+  {"id": "espalda", "nombre": "Estiramiento de espalda", "icono": "🏃", "pasos": ["Parate y estira los brazos hacia arriba (10 seg)", "Inclinate hacia adelante y toca tus pies (10 seg)", "Gira el tronco a cada lado (5 veces)"]},
+  {"id": "visual",  "nombre": "Descanso visual",         "icono": "👁️", "pasos": ["Mira un objeto lejano 6+ metros por 20 seg", "Cierra los ojos y apoyalos con las palmas (10 seg)", "Parpadea rapidamente 10 veces"]},
+  {"id": "manos",   "nombre": "Ejercicio de manos",      "icono": "✋", "pasos": ["Abre y cierra los punos (10 veces)", "Gira las munecas en circulos (5 por lado)", "Estira los dedos hacia atras suavemente (10 seg)"]},
+  {"id": "sentad",  "nombre": "Sentadillas rapidas",     "icono": "🏋️", "pasos": ["Parate con pies al ancho de los hombros", "Baja lentamente hasta 90 grados (5 veces)", "Manten la espalda recta en todo momento"]},
+  {"id": "respira", "nombre": "Respiracion profunda",    "icono": "🌬️", "pasos": ["Inhala profundo por 4 segundos", "Reten el aire 4 segundos", "Exhala lentamente por 6 segundos (repite 5 veces)"]},
+  {"id": "caminar", "nombre": "Caminar",                 "icono": "🚶", "pasos": ["Levantate y camina al menos 50 pasos", "Sube y baja escaleras si es posible", "Regresa y estira las piernas brevemente"]},
+  {"id": "postura", "nombre": "Postura de poder",        "icono": "🧍", "pasos": ["Parate derecho, pies al ancho de los hombros", "Hombros hacia atras y abajo, pecho al frente", "Menton paralelo al piso, manten 30 segundos respirando profundo"]}
+]
