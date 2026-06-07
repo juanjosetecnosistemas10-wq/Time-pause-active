@@ -58,6 +58,7 @@ class ConfigManager:
 
     def save_config(self, cfg: dict[str, Any], profile: str | None = None) -> None:
         path = self._profile_path(profile) if profile else self._config_file
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
 

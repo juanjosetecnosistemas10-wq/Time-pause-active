@@ -25,26 +25,21 @@ def send_win_notification(
                 msg=msg,
                 duration=duration,
             )
-            try:
-                from winotify import audio as winaudio
-                sound_map = {
-                    "default": winaudio.Default,
-                    "sms": winaudio.SMS,
-                    "mail": winaudio.Mail,
-                    "reminder": winaudio.Reminder,
-                    "loop": winaudio.LoopingCall,
-                }
-                toast.set_audio(sound_map.get(sound, winaudio.Default), loop=False)
-            except Exception:
-                pass
+            if sound and sound.lower() != "none":
+                try:
+                    from winotify import audio as winaudio
+                    sound_map = {
+                        "default": winaudio.Default,
+                        "sms": winaudio.SMS,
+                        "mail": winaudio.Mail,
+                        "reminder": winaudio.Reminder,
+                        "loop": winaudio.LoopingCall,
+                    }
+                    toast.set_audio(sound_map.get(sound, winaudio.Default), loop=False)
+                except Exception:
+                    pass
             toast.show()
             return
         except Exception:
             pass
-    try:
-        import ctypes
-        MB_OK: int = 0
-        MB_SERVICE_NOTIFICATION: int = 0x00200000
-        ctypes.windll.user32.MessageBoxW(0, msg, title, MB_OK | MB_SERVICE_NOTIFICATION)
-    except Exception:
-        pass
+    log.warning("winotify no disponible, notificación omitida: %s - %s", title, msg)

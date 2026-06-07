@@ -1,4 +1,4 @@
-"""Todas las ventanas de la UI."""
+"""Todas las ventanas de la UI (FlowBreak)."""
 
 from __future__ import annotations
 
@@ -8,13 +8,13 @@ import subprocess
 import sys
 import threading
 import winreg
-import tkinter as tk
-from tkinter import ttk
+import customtkinter as ctk
+from tkinter import Canvas, filedialog, messagebox
 from typing import Any, Callable
 
 from pausa_activa.constants import (
-    BG, BG2, BG3, ACCENT, ACCENT2, GREEN, YELLOW, TEXT, TEXT_DIM, BORDER, AGUA,
-    APP_NAME, EJERCICIOS, FRASES, set_theme, set_idioma, _, I18N, THEMES,
+    C, APP_NAME, APP_DISPLAY, EJERCICIOS, get_random_phrase, set_theme, set_idioma,
+    _, I18N, THEMES, center_window,
     log,
 )
 from pausa_activa.audio import AudioManager
@@ -59,157 +59,58 @@ def get_autoarranque() -> bool:
         return False
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Widgets reutilizables modernos
-# ═══════════════════════════════════════════════════════════════════════════
-
-class ModernButton(tk.Canvas):
-    """Botón moderno con hover effect y bordes redondeados."""
-    def __init__(
-        self, parent: tk.Widget, text: str, command: Callable[[], Any] | None = None,
-        bg_color: str = ACCENT, fg_color: str = TEXT, hov_color: str | None = None,
-        font: tuple[str, int, str] = ("Segoe UI", 10), padx: int = 20, pady: int = 8,
-        **kwargs: Any,
-    ) -> None:
-        self._bg = bg_color
-        self._fg = fg_color
-        self._hov = hov_color or self._lighten(bg_color)
-        self._cmd = command
-        self._font = font
-        self._padx = padx
-        self._pady = pady
-        self._text = text
-        super().__init__(parent, bg=BG, highlightthickness=0, relief="flat", **kwargs)
-        self._text_id: int | None = None
-        self._draw()
-        self.bind("<Enter>", self._on_enter)
-        self.bind("<Leave>", self._on_leave)
-        self.bind("<Button-1>", self._on_click)
-
-    def _lighten(self, color: str) -> str:
-        r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
-        r = min(255, r + 30)
-        g = min(255, g + 30)
-        b = min(255, b + 30)
-        return f"#{r:02x}{g:02x}{b:02x}"
-
-    def _draw(self) -> None:
-        self.delete("all")
-        # Measure text
-        tmp = tk.Label(self, text=self._text, font=self._font)
-        tmp.update_idletasks()
-        tw = tmp.winfo_reqwidth()
-        th = tmp.winfo_reqheight()
-        tmp.destroy()
-        w = tw + self._padx * 2 + 16
-        h = th + self._pady * 2 + 8
-        r = 8
-        self.configure(width=w, height=h)
-        self.coords("all")
-        self.create_rounded_rect(0, 0, w, h, r, fill=self._bg, outline="", tags="bg")
-        self._text_id = self.create_text(
-            w // 2, h // 2, text=self._text, font=self._font,
-            fill=self._fg, tags="txt", anchor="center"
-        )
-
-    def create_rounded_rect(
-        self, x1: float, y1: float, x2: float, y2: float, r: float,
-        **kwargs: Any,
-    ) -> int:
-        points = [
-            x1 + r, y1, x1 + r, y1, x2 - r, y1,
-            x2 - r, y1, x2, y1, x2, y1 + r,
-            x2, y1 + r, x2, y2 - r, x2, y2 - r,
-            x2, y2, x2 - r, y2, x2 - r, y2,
-            x1 + r, y2, x1 + r, y2, x1, y2,
-            x1, y2 - r, x1, y2 - r, x1, y1 + r,
-            x1, y1 + r, x1, y1,
-        ]
-        return self.create_polygon(points, smooth=True, **kwargs)
-
-    def _on_enter(self, _: Any) -> None:
-        if self._text_id:
-            self.itemconfig("bg", fill=self._hov)
-
-    def _on_leave(self, _: Any) -> None:
-        if self._text_id:
-            self.itemconfig("bg", fill=self._bg)
-
-    def _on_click(self, _: Any) -> None:
-        if self._cmd:
-            self._cmd()
-
-
-def _card(parent: tk.Widget, **kwargs: Any) -> tk.Frame:
-    """Crea una tarjeta con borde sutil."""
-    f = tk.Frame(parent, bg=BG2, highlightthickness=1, highlightbackground=BORDER, **kwargs)
-    return f
-
-
-def _label(parent: tk.Widget, text: str, **kwargs: Any) -> tk.Label:
-    return tk.Label(parent, text=text, bg=parent["bg"], fg=TEXT,
-                    font=("Segoe UI", 10), **kwargs)
-
-
-def _heading(parent: tk.Widget, text: str, **kwargs: Any) -> tk.Label:
-    return tk.Label(parent, text=text, bg=parent["bg"], fg=TEXT,
-                    font=("Segoe UI", 13, "bold"), **kwargs)
-
-
-def _subheading(parent: tk.Widget, text: str, **kwargs: Any) -> tk.Label:
-    return tk.Label(parent, text=text, bg=parent["bg"], fg=TEXT_DIM,
-                    font=("Segoe UI", 9, "bold"), **kwargs)
-
-
-def _entry(parent: tk.Widget, variable: tk.StringVar, width: int = 10) -> tk.Entry:
-    return tk.Entry(parent, textvariable=variable, font=("Segoe UI", 11),
-                    bg=BG3, fg=TEXT, insertbackground=TEXT, relief="flat", bd=0,
-                    width=width, highlightthickness=1, highlightbackground=BORDER,
-                    highlightcolor=ACCENT)
-
-
-def _checkbox(parent: tk.Widget, text: str, variable: tk.BooleanVar) -> tk.Checkbutton:
-    return tk.Checkbutton(parent, text=f"  {text}", variable=variable,
-                          font=("Segoe UI", 9), bg=parent["bg"], fg=TEXT,
-                          selectcolor=BG3 if BG != BG3 else BG2,
-                          activebackground=parent["bg"], activeforeground=TEXT)
-
-
-def _radio(parent: tk.Widget, text: str, variable: tk.StringVar, value: str) -> tk.Radiobutton:
-    return tk.Radiobutton(parent, text=f"  {text}", variable=variable, value=value,
-                          font=("Segoe UI", 9), bg=parent["bg"], fg=TEXT,
-                          selectcolor=BG3 if BG != BG3 else BG2,
-                          activebackground=parent["bg"], activeforeground=TEXT)
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Clase base
 # ═══════════════════════════════════════════════════════════════════════════
 
-class CenteredWindow(tk.Toplevel):
-    def __init__(self, parent: tk.Tk | tk.Toplevel, *args: Any, **kwargs: Any) -> None:
+
+def _card(parent: ctk.CTkBaseClass, **kwargs: Any) -> ctk.CTkFrame:
+    kwargs.setdefault("fg_color", C.CARD)
+    kwargs.setdefault("corner_radius", 12)
+    kwargs.setdefault("border_width", 0)
+    kwargs.setdefault("border_color", C.CARD_BORDER)
+    return ctk.CTkFrame(parent, **kwargs)
+
+
+def _entry(parent: ctk.CTkBaseClass, variable: ctk.Variable, width: int = 120) -> ctk.CTkEntry:
+    return ctk.CTkEntry(parent, textvariable=variable, font=("Segoe UI", 11),
+                        fg_color=C.BG3, text_color=C.TEXT, border_color=C.BORDER,
+                        width=width, corner_radius=6)
+
+
+def _checkbox(parent: ctk.CTkBaseClass, text: str, variable: ctk.Variable) -> ctk.CTkCheckBox:
+    return ctk.CTkCheckBox(parent, text=text, variable=variable,
+                           fg_color=C.ACCENT, text_color=C.TEXT,
+                           font=("Segoe UI", 9), hover_color=C.ACCENT2,
+                           corner_radius=4, border_width=2, checkmark_color=C.BG)
+
+
+def _radio(parent: ctk.CTkBaseClass, text: str, variable: ctk.Variable, value: str) -> ctk.CTkRadioButton:
+    return ctk.CTkRadioButton(parent, text=text, variable=variable, value=value,
+                              fg_color=C.ACCENT, text_color=C.TEXT,
+                              font=("Segoe UI", 9), hover_color=C.ACCENT2,
+                              border_width_checked=5, border_width_unchecked=2)
+
+
+class CenteredWindow(ctk.CTkToplevel):
+    def __init__(self, parent: ctk.CTkBaseClass, *args: Any, **kwargs: Any) -> None:
         super().__init__(parent, *args, **kwargs)
-        self.configure(bg=BG)
         self.resizable(False, False)
 
     def center(self) -> None:
-        self.update_idletasks()
-        w: int = self.winfo_width()
-        h: int = self.winfo_height()
-        sw: int = self.winfo_screenwidth()
-        sh: int = self.winfo_screenheight()
-        self.geometry(f"+{(sw - w) // 2}+{(sh - h) // 2}")
+        center_window(self)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Gráfico de barras simple para stats
+# Gráfico de barras con Canvas
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _dibujar_grafico(parent: tk.Frame, history: dict[str, dict[str, Any]], meta: int) -> None:
-    """Dibuja un gráfico de barras ASCII/texto para los últimos 7 días."""
+def _dibujar_grafico(parent: ctk.CTkFrame, history: dict[str, dict[str, Any]], meta: int) -> Canvas:
     import datetime as dt
     from calendar import day_abbr
-    p_bg: str = parent["bg"] if parent else BG
+    canvas = Canvas(parent, width=340, height=140, bg=C.CARD, highlightthickness=0)
+    canvas.pack(padx=10, pady=10)
     today = dt.date.today()
     days: list[str] = [(today - dt.timedelta(days=i)).isoformat() for i in range(6, -1, -1)]
     max_val: int = max(
@@ -217,32 +118,37 @@ def _dibujar_grafico(parent: tk.Frame, history: dict[str, dict[str, Any]], meta:
         default=meta,
     )
     max_val = max(max_val, meta, 1)
-    bar_chars: str = "█▇▆▅▄▃▂▁"
-    for dia_iso in days:
+    bar_w: int = 30
+    gap: int = 12
+    start_x: int = 25
+    bottom_y: int = 115
+    max_h: int = 85
+    for i, dia_iso in enumerate(days):
         data = history.get(dia_iso, {"completadas": 0, "saltadas": 0})
         comp = data["completadas"]
-        bar_len: int = int((comp / max_val) * 10) if max_val else 0
-        bar: str = bar_chars[0] * bar_len if bar_len else "▁"
+        bar_h: int = int((comp / max_val) * max_h) if max_val else 0
+        x0: int = start_x + i * (bar_w + gap)
+        x1: int = x0 + bar_w
+        y0: int = bottom_y - bar_h
+        y1: int = bottom_y
+        canvas.create_rectangle(x0, y0, x1, y1, fill=C.ACCENT, outline="", width=0)
+        canvas.create_text((x0 + x1) // 2, y0 - 5, text=str(comp),
+                           fill=C.TEXT_DIM, font=("Segoe UI", 8))
         weekday_num: int = dt.date.fromisoformat(dia_iso).weekday()
-        weekday_name: str = day_abbr[weekday_num]
-        row = tk.Frame(parent, bg=p_bg)
-        row.pack(fill="x", padx=8, pady=1)
-        tk.Label(row, text=f"{weekday_name}", font=("Segoe UI", 7), bg=p_bg,
-                 fg=TEXT_DIM, width=4, anchor="e").pack(side="left")
-        tk.Label(row, text=bar, font=("Segoe UI", 8), bg=p_bg, fg=ACCENT,
-                 anchor="w").pack(side="left", padx=(4, 0))
-        tk.Label(row, text=f"{comp}", font=("Segoe UI", 7), bg=p_bg,
-                 fg=TEXT_DIM).pack(side="left", padx=(4, 0))
+        canvas.create_text((x0 + x1) // 2, bottom_y + 10,
+                           text=day_abbr[weekday_num][:3],
+                           fill=C.TEXT_DIM, font=("Segoe UI", 7))
+    return canvas
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# PausaWindow
+# BreakWindow (antes PausaWindow)
 # ═══════════════════════════════════════════════════════════════════════════
 
-class PausaWindow(CenteredWindow):
+class BreakWindow(CenteredWindow):
     def __init__(
         self,
-        parent: tk.Tk,
+        parent: ctk.CTkBaseClass,
         ejercicio: dict[str, Any],
         duracion_sec: int,
         on_done: Callable[[], None],
@@ -253,10 +159,17 @@ class PausaWindow(CenteredWindow):
         self.on_done: Callable[[], None] = on_done
         self.on_skip: Callable[[], None] = on_skip
         self.remaining: int = duracion_sec
+        self._duracion_original: int = duracion_sec
         self.ejercicio: dict[str, Any] = ejercicio
         self._job: str | None = None
-        self.title("Pausa Activa")
+        pasos = self.ejercicio.get("pasos", [])
+        self._num_steps: int = len(pasos)
+        self._current_step: int = 0
+        self._step_interval: float = duracion_sec / max(self._num_steps, 1)
+        self._step_frames: list[dict[str, Any]] = []
+        self.title(_("pausa_activa"))
         self.attributes("-topmost", True)
+        self.configure(fg_color=C.BG)
         self._build()
         self.center()
         self._tick()
@@ -265,48 +178,44 @@ class PausaWindow(CenteredWindow):
             audio_manager.start_ambient(sonido_ambiente)
 
     def _build(self) -> None:
-        # Header con gradiente visual
-        header = tk.Frame(self, bg=ACCENT, height=48)
-        header.pack(fill="x")
-        header.pack_propagate(False)
-        tk.Label(header, text=_("pausa_activa"), font=("Segoe UI", 10, "bold"),
-                 bg=ACCENT, fg=BG).pack(expand=True)
+        main = _card(self, fg_color=C.BG2)
+        main.pack(fill="both", expand=True, padx=16, pady=16)
 
-        # Icono grande
-        tk.Label(self, text=self.ejercicio["icono"], font=("Segoe UI Emoji", 56),
-                 bg=BG).pack(pady=(16, 0))
-        tk.Label(self, text=self.ejercicio["nombre"], font=("Segoe UI", 16, "bold"),
-                 bg=BG, fg=TEXT).pack(pady=(4, 0))
+        # Exercise icon
+        ctk.CTkLabel(main, text=self.ejercicio["icono"], font=("Segoe UI Emoji", 40),
+                     text_color=C.TEXT).pack(pady=(20, 0))
 
-        # Tarjeta de pasos
-        fp = _card(self)
-        fp.pack(padx=28, fill="x", pady=(12, 8))
-        for i, paso in enumerate(self.ejercicio["pasos"], 1):
-            r = tk.Frame(fp, bg=BG2)
-            r.pack(fill="x", padx=14, pady=5)
-            num = tk.Label(r, text=f"{i}", font=("Segoe UI", 8, "bold"),
-                           bg=ACCENT, fg=BG, width=2, height=1)
-            num.pack(side="left", padx=(0, 10))
-            tk.Label(r, text=paso, font=("Segoe UI", 10), bg=BG2,
-                     fg=TEXT, wraplength=280, justify="left").pack(side="left")
+        ctk.CTkLabel(main, text=self.ejercicio["nombre"], font=("Segoe UI", 17, "bold"),
+                     text_color=C.TEXT).pack(pady=(4, 0))
 
-        # Timer grande
-        self.lbl_t = tk.Label(self, text=self._fmt_time(self.remaining),
-                              font=("Segoe UI", 40, "bold"), bg=BG, fg=GREEN)
-        self.lbl_t.pack(pady=(10, 2))
-        tk.Label(self, text=_("tiempo_restante"), font=("Segoe UI", 8),
-                 bg=BG, fg=TEXT_DIM).pack()
+        # Step progress dots
+        if self._num_steps > 1:
+            dot_frame = ctk.CTkFrame(main, fg_color="transparent")
+            dot_frame.pack(pady=(8, 4))
+            self._step_dots: list[ctk.CTkLabel] = []
+            for i in range(self._num_steps):
+                dot = ctk.CTkLabel(dot_frame, text="●", font=("Segoe UI", 10),
+                                   text_color=C.BG3)
+                dot.pack(side="left", padx=4)
+                self._step_dots.append(dot)
 
-        # Barra de progreso
-        pb_frame = tk.Frame(self, bg=BG3, height=6, width=340)
-        pb_frame.pack(pady=(10, 0))
-        pb_frame.pack_propagate(False)
-        self._pb_fill = tk.Frame(pb_frame, bg=GREEN, height=6, width=340)
-        self._pb_fill.pack(side="left", anchor="w")
+        # Current step text
+        step_card = _card(main, fg_color=C.CARD)
+        step_card.pack(fill="x", padx=20, pady=(4, 8))
+        self._step_label = ctk.CTkLabel(step_card, text="", font=("Segoe UI", 11),
+                                        text_color=C.TEXT, wraplength=280)
+        self._step_label.pack(padx=16, pady=10)
 
-        ModernButton(self, text=_("saltar_pausa"), bg_color=BG3, fg_color=TEXT_DIM,
-                     font=("Segoe UI", 9), padx=16, pady=4,
-                     command=self._skip).pack(pady=(16, 20))
+        # Circular timer
+        self._canvas = Canvas(main, width=200, height=200, bg=C.BG2, highlightthickness=0)
+        self._canvas.pack(pady=(4, 0))
+
+        # Skip
+        ctk.CTkButton(main, text=_("saltar_pausa"),
+                      fg_color="transparent", text_color=C.TEXT_MUTED,
+                      font=("Segoe UI", 9),
+                      hover_color=C.BG3, corner_radius=8,
+                      command=self._skip).pack(pady=(8, 14))
 
     @staticmethod
     def _fmt_time(s: int) -> str:
@@ -314,14 +223,54 @@ class PausaWindow(CenteredWindow):
         return f"{m:02d}:{s:02d}"
 
     def _tick(self) -> None:
-        if self.remaining <= 0:
+        try:
+            if self.remaining <= 0:
+                self._done()
+                return
+
+            # Advance step animation based on elapsed time
+            elapsed: int = self._duracion_original - self.remaining
+            next_step: int = min(int(elapsed / self._step_interval) if self._step_interval > 0 else 0,
+                                 self._num_steps - 1)
+            if next_step != self._current_step:
+                self._current_step = next_step
+                self._highlight_step()
+
+            self._canvas.delete("all")
+            pct: float = max(0.0, self.remaining / self._duracion_original)
+            if pct > 0.5:
+                color: str = C.GREEN
+            elif pct > 0.2:
+                color = C.YELLOW
+            else:
+                color = C.ACCENT2
+            cx: int = 100
+            cy: int = 100
+            r: int = 78
+            self._canvas.create_oval(cx - r, cy - r, cx + r, cy + r, outline=C.BG3, width=7)
+            extent: float = 360.0 * pct
+            self._canvas.create_arc(cx - r, cy - r, cx + r, cy + r, start=90,
+                                    extent=extent, outline=color, width=7, style="arc")
+            self._canvas.create_text(cx, cy, text=self._fmt_time(self.remaining),
+                                      font=("Segoe UI", 30, "bold"), fill=C.TEXT)
+            self.remaining -= 1
+            self._job = self.after(1000, self._tick)
+        except Exception as ex:
+            log.exception("Error en BreakWindow._tick: %s", ex)
             self._done()
-            return
-        self.lbl_t.config(text=self._fmt_time(self.remaining))
-        pct = max(0, int(340 * self.remaining / (self.remaining + 1)))
-        self._pb_fill.configure(width=pct)
-        self.remaining -= 1
-        self._job = self.after(1000, self._tick)
+
+    def _highlight_step(self) -> None:
+        pasos: list[str] = self.ejercicio.get("pasos", [])
+        if self._current_step < len(pasos):
+            self._step_label.configure(text=f"→ {pasos[self._current_step]}")
+        if hasattr(self, "_step_dots"):
+            for i, dot in enumerate(self._step_dots):
+                if i < self._current_step:
+                    dot.configure(text_color=C.GREEN)
+                elif i == self._current_step:
+                    dot.configure(text_color=C.ACCENT)
+                else:
+                    dot.configure(text_color=C.BG3)
 
     def _done(self) -> None:
         audio_manager.stop_ambient()
@@ -339,13 +288,13 @@ class PausaWindow(CenteredWindow):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# StatsWindow con gráfico
+# StatsWindow con gráfico Canvas
 # ═══════════════════════════════════════════════════════════════════════════
 
 class StatsWindow(CenteredWindow):
     def __init__(
         self,
-        parent: tk.Tk,
+        parent: ctk.CTkBaseClass,
         stats: dict[str, Any],
         meta: int,
         hist_file: str,
@@ -354,83 +303,123 @@ class StatsWindow(CenteredWindow):
         super().__init__(parent)
         self.title(_("estadisticas"))
         self.attributes("-topmost", True)
+        self.configure(fg_color=C.BG)
         total: int = stats["completadas"] + stats["saltadas"]
         pct: int = int(stats["completadas"] / total * 100) if total else 0
         meta_ok: bool = stats["completadas"] >= meta
 
-        # Header
-        header = tk.Frame(self, bg=ACCENT, height=48)
-        header.pack(fill="x")
-        header.pack_propagate(False)
-        tk.Label(header, text=_("estadisticas"), font=("Segoe UI", 11, "bold"),
-                 bg=ACCENT, fg=BG).pack(expand=True)
+        main = _card(self, fg_color=C.BG2)
+        main.pack(fill="both", expand=True, padx=16, pady=16)
 
-        # Tarjeta principal de stats
-        card = _card(self)
-        card.pack(padx=24, fill="x", pady=(16, 8))
+        ctk.CTkLabel(main, text=_("estadisticas"), font=("Segoe UI", 14, "bold"),
+                     text_color=C.TEXT).pack(pady=(14, 8))
+
+        # Stats pills
+        pill_frame = ctk.CTkFrame(main, fg_color="transparent")
+        pill_frame.pack()
+        pills: list[tuple[str, str, str]] = [
+            ("✅", f"{stats['completadas']}", C.GREEN),
+            ("⏭", str(stats["saltadas"]), C.ACCENT2),
+            ("📈", f"{pct}%", C.ACCENT),
+            ("🔥", f"{stats.get('racha', 0)}d", C.YELLOW),
+        ]
+        for icon, val, color in pills:
+            p = _card(pill_frame, fg_color=C.CARD, corner_radius=10)
+            p.pack(side="left", padx=4)
+            ctk.CTkLabel(p, text=icon, font=("Segoe UI", 12),
+                         text_color=C.TEXT_DIM).pack(side="left", padx=(10, 2), pady=6)
+            ctk.CTkLabel(p, text=val, font=("Segoe UI", 14, "bold"),
+                         text_color=color).pack(side="left", padx=(0, 10), pady=6)
+
+        # Detail rows
+        card = _card(main, fg_color=C.CARD)
+        card.pack(fill="x", pady=(10, 0))
+        status_icon: str = "🎯" if meta_ok else "🔄"
+        status_color: str = C.GREEN if meta_ok else C.TEXT_MUTED
         rows: list[tuple[str, str, str]] = [
-            ("Pausas completadas", f"{stats['completadas']} / {meta}", GREEN),
-            ("Pausas saltadas",    str(stats["saltadas"]),              ACCENT2),
-            ("Tasa de exito",      f"{pct}%",                          ACCENT),
-            ("Racha actual",       f"{stats.get('racha', 0)} días consecutivos", YELLOW),
-            ("Meta diaria",        "✓ CUMPLIDA" if meta_ok else "○ En progreso",
-             GREEN if meta_ok else TEXT_DIM),
+            (_("stats_completadas"), f"{stats['completadas']} / {meta}", C.GREEN),
+            (_("stats_saltadas"),    str(stats["saltadas"]),              C.ACCENT2),
+            (_("stats_tasa_exito"),  f"{pct}%",                          C.ACCENT),
+            (_("stats_racha"),       f"{stats.get('racha', 0)} d", C.YELLOW),
+            (_("stats_meta_diaria"), f"{status_icon} {_('stats_cumplida') if meta_ok else _('stats_en_progreso')}", status_color),
         ]
         for label, val, color in rows:
-            r = tk.Frame(card, bg=BG2)
-            r.pack(fill="x", padx=16, pady=7)
-            tk.Label(r, text=label, font=("Segoe UI", 10), bg=BG2,
-                     fg=TEXT_DIM, anchor="w").pack(side="left")
-            tk.Label(r, text=val, font=("Segoe UI", 11, "bold"), bg=BG2,
-                     fg=color).pack(side="right")
+            r = ctk.CTkFrame(card, fg_color="transparent")
+            r.pack(fill="x", padx=14, pady=4)
+            ctk.CTkLabel(r, text=label, font=("Segoe UI", 9),
+                         text_color=C.TEXT_MUTED, anchor="w").pack(side="left")
+            ctk.CTkLabel(r, text=val, font=("Segoe UI", 10, "bold"),
+                         text_color=color).pack(side="right")
 
-        # Gráfico semanal
         if history:
-            _subheading(self, text="Últimos 7 días").pack(pady=(10, 2), anchor="w", padx=28)
-            graph_card = _card(self)
-            graph_card.pack(padx=28, fill="x")
+            ctk.CTkLabel(main, text=_("ultimos_7_dias"), font=("Segoe UI", 9, "bold"),
+                         text_color=C.TEXT_DIM).pack(pady=(8, 2), anchor="w", padx=4)
+            graph_card = _card(main, fg_color=C.CARD)
+            graph_card.pack(fill="x")
             _dibujar_grafico(graph_card, history, meta)
 
-        # Historial
         if stats["historial"]:
-            _subheading(self, text="Últimas pausas").pack(pady=(10, 2), anchor="w", padx=28)
-            hist_card = _card(self)
-            hist_card.pack(padx=28, fill="x", pady=(0, 12))
+            ctk.CTkLabel(main, text=_("ultimas_pausas"), font=("Segoe UI", 9, "bold"),
+                         text_color=C.TEXT_DIM).pack(pady=(8, 2), anchor="w", padx=4)
+            hist_card = _card(main, fg_color=C.CARD)
+            hist_card.pack(fill="x")
             for entry in stats["historial"][-5:][::-1]:
-                color = GREEN if entry["estado"] == "completada" else ACCENT2
-                r = tk.Frame(hist_card, bg=BG2)
-                r.pack(fill="x", padx=14, pady=4)
-                tk.Label(r, text=f"{entry['hora']}  •  {entry['ejercicio']}",
-                         font=("Segoe UI", 9), bg=BG2,
-                         fg=color).pack(side="left")
-                tk.Label(r, text=f"[{entry['estado']}]",
-                         font=("Segoe UI", 8, "bold"), bg=BG2,
-                         fg=color).pack(side="right")
+                dot: str = "🟢" if entry["estado"] == "completada" else "🔴"
+                r = ctk.CTkFrame(hist_card, fg_color="transparent")
+                r.pack(fill="x", padx=12, pady=2)
+                ctk.CTkLabel(r, text=f"{dot}  {entry['hora']}  \u2022  {entry['ejercicio']}",
+                             font=("Segoe UI", 9), text_color=C.TEXT).pack(side="left")
+                ctk.CTkLabel(r, text=f"[{entry['estado']}]",
+                             font=("Segoe UI", 8, "bold"),
+                              text_color=C.GREEN if entry["estado"] == "completada" else C.ACCENT2).pack(side="right")
 
-        bf = tk.Frame(self, bg=BG)
-        bf.pack(pady=14)
-        ModernButton(bf, text=_("exportar_csv"), bg_color=BG3, fg_color=TEXT,
-                     font=("Segoe UI", 9), padx=14, pady=4,
-                     command=lambda: self._open_csv(hist_file)).pack(side="left", padx=4)
-        ModernButton(bf, text=_("cerrar"), bg_color=ACCENT, fg_color=BG,
-                     font=("Segoe UI", 10, "bold"), padx=20, pady=6,
-                     command=self.destroy).pack(side="left", padx=4)
+        bf = ctk.CTkFrame(main, fg_color="transparent")
+        bf.pack(pady=(10, 14))
+        ctk.CTkButton(bf, text=_("exportar_csv"), fg_color=C.BG3, text_color=C.TEXT,
+                      font=("Segoe UI", 9), corner_radius=12,
+                      command=lambda: self._export(hist_file, stats, meta)).pack(side="left", padx=4)
+        ctk.CTkButton(bf, text=_("cerrar"), fg_color=C.ACCENT, text_color=C.BG,
+                      font=("Segoe UI", 9, "bold"), corner_radius=12,
+                      command=self.destroy).pack(side="left", padx=4)
         self.center()
 
     @staticmethod
-    def _open_csv(hist_file: str) -> None:
-        if os.path.exists(hist_file):
-            subprocess.run(["notepad.exe", hist_file])
+    def _export(hist_file: str, stats: dict[str, Any], meta: int) -> None:
+        from datetime import datetime as _dt
+        path = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV", "*.csv"), ("JSON", "*.json"), (_("todos"), "*.*")],
+            title=_("exportar_stats"),
+        )
+        if not path:
+            return
+        try:
+            if path.endswith(".json"):
+                import json
+                stats["meta_pausas"] = meta
+                stats["exportado"] = _dt.now().isoformat()
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(stats, f, indent=2, ensure_ascii=False)
+            else:
+                import shutil
+                if os.path.exists(hist_file):
+                    shutil.copy2(hist_file, path)
+                else:
+                    with open(path, "w", encoding="utf-8") as f:
+                        f.write("fecha,hora,ejercicio,estado\n")
+            messagebox.showinfo(_("exportar"), _("exportado_ok").format(path=path))
+        except Exception as e:
+            messagebox.showerror(_("error"), _("exportado_error").format(e=e))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# ConfigWindow con perfiles, temas, modos, idioma, notificaciones
+# ConfigWindow con CTkTabview
 # ═══════════════════════════════════════════════════════════════════════════
 
 class ConfigWindow(CenteredWindow):
     def __init__(
         self,
-        parent: tk.Tk,
+        parent: ctk.CTkBaseClass,
         cfg: dict[str, Any],
         on_save: Callable[[dict[str, Any]], None],
         app_path: str,
@@ -443,208 +432,211 @@ class ConfigWindow(CenteredWindow):
         self._profiles: list[str] = profiles or ["default"]
         self.title(_("configuracion"))
         self.attributes("-topmost", True)
+        self.configure(fg_color=C.BG)
         self._build()
         self.center()
 
-    def _field(self, parent: tk.Frame, label: str, var: tk.StringVar, row: int) -> None:
-        tk.Label(parent, text=label, font=("Segoe UI", 10), bg=BG2,
-                 fg=TEXT_DIM, anchor="w").grid(
+    def _field(self, parent: ctk.CTkFrame, label: str, var: ctk.Variable, row: int) -> None:
+        ctk.CTkLabel(parent, text=label, font=("Segoe UI", 10),
+                     text_color=C.TEXT_MUTED, anchor="w").grid(
             row=row, column=0, sticky="w", padx=16, pady=8)
         _entry(parent, var).grid(row=row, column=1, padx=16, pady=8, sticky="e")
 
-    def _tab(self, nb: ttk.Notebook, title: str) -> tk.Frame:
-        f = tk.Frame(nb, bg=BG, padx=14, pady=10)
-        nb.add(f, text=f"  {title}  ")
-        return f
-
-    def _config_style(self, style_name: str, color: str) -> None:
-        s = ttk.Style(self)
-        s.theme_use("default")
-        s.configure(style_name, troughcolor=BG3, background=color,
-                    bordercolor=BG3, lightcolor=color, darkcolor=color)
-
     def _build(self) -> None:
-        # Header
-        header = tk.Frame(self, bg=ACCENT, height=48)
-        header.pack(fill="x")
-        header.pack_propagate(False)
-        tk.Label(header, text=_("configuracion"), font=("Segoe UI", 11, "bold"),
-                 bg=ACCENT, fg=BG).pack(expand=True)
+        main = _card(self, fg_color=C.BG2)
+        main.pack(fill="both", expand=True, padx=16, pady=16)
 
-        style = ttk.Style(self)
-        style.theme_use("default")
-        style.configure("Dark.TNotebook", background=BG, borderwidth=0)
-        style.configure("Dark.TNotebook.Tab", background=BG3, foreground=TEXT_DIM,
-                        padding=[12, 5], font=("Segoe UI", 9))
-        style.map("Dark.TNotebook.Tab",
-                  background=[("selected", BG2)],
-                  foreground=[("selected", TEXT)])
-        nb = ttk.Notebook(self, style="Dark.TNotebook")
-        nb.pack(fill="both", expand=True, padx=14, pady=(0, 6))
+        ctk.CTkLabel(main, text=_("configuracion"), font=("Segoe UI", 14, "bold"),
+                     text_color=C.TEXT).pack(pady=(12, 4))
+
+        self.tabview = ctk.CTkTabview(main, fg_color="transparent",
+                                       segmented_button_fg_color=C.BG3,
+                                       segmented_button_selected_color=C.ACCENT,
+                                       segmented_button_selected_hover_color=C.ACCENT,
+                                       segmented_button_unselected_color=C.BG4,
+                                       text_color=C.TEXT)
+        self.tabview.pack(fill="both", expand=True, padx=4, pady=(2, 4))
+
+        t1 = self.tabview.add(_("config_temporizador"))
+        t2 = self.tabview.add(_("config_opciones"))
+        t3 = self.tabview.add(_("config_sonido"))
+        t4 = self.tabview.add(_("config_ejercicios"))
 
         # ── TAB 1: Temporizador ──
-        t1 = self._tab(nb, _("config_temporizador"))
-        self.v_int = tk.StringVar(value=str(self.cfg["intervalo_min"]))
-        self.v_dur = tk.StringVar(value=str(self.cfg["duracion_pausa_min"]))
-        self.v_ini = tk.StringVar(value=self.cfg["hora_inicio"])
-        self.v_fin = tk.StringVar(value=self.cfg["hora_fin"])
-        self.v_pos = tk.StringVar(value=str(self.cfg["posponer_min"]))
-        self.v_meta = tk.StringVar(value=str(self.cfg["meta_pausas"]))
-        self.v_modo = tk.StringVar(value=self.cfg.get("modo", "normal"))
+        self.v_int = ctk.StringVar(value=str(self.cfg["intervalo_min"]))
+        self.v_dur = ctk.StringVar(value=str(self.cfg["duracion_pausa_min"]))
+        self.v_ini = ctk.StringVar(value=self.cfg["hora_inicio"])
+        self.v_fin = ctk.StringVar(value=self.cfg["hora_fin"])
+        self.v_pos = ctk.StringVar(value=str(self.cfg["posponer_min"]))
+        self.v_meta = ctk.StringVar(value=str(self.cfg["meta_pausas"]))
+        self.v_modo = ctk.StringVar(value=self.cfg.get("modo", "normal"))
 
         card_t1 = _card(t1)
-        card_t1.pack(fill="x")
-        self._field(card_t1, "Intervalo entre pausas (min)", self.v_int, 0)
-        self._field(card_t1, "Duración de la pausa (min)",   self.v_dur, 1)
-        self._field(card_t1, "Hora inicio (HH:MM)",          self.v_ini, 2)
-        self._field(card_t1, "Hora fin (HH:MM)",             self.v_fin, 3)
-        self._field(card_t1, "Minutos para posponer",        self.v_pos, 4)
-        self._field(card_t1, "Meta de pausas diarias",       self.v_meta, 5)
+        card_t1.pack(fill="x", pady=(4, 0))
+        self._field(card_t1, _("field_intervalo"), self.v_int, 0)
+        self._field(card_t1, _("field_duracion_pausa"),   self.v_dur, 1)
+        self._field(card_t1, _("field_hora_inicio"),          self.v_ini, 2)
+        self._field(card_t1, _("field_hora_fin"),             self.v_fin, 3)
+        self._field(card_t1, _("field_posponer"),        self.v_pos, 4)
+        self._field(card_t1, _("field_meta_pausas"),       self.v_meta, 5)
 
         modo_card = _card(t1)
-        modo_card.pack(fill="x", pady=(8, 0))
-        _subheading(modo_card, text="Modo de timer").pack(anchor="w", padx=14, pady=(8, 4))
+        modo_card.pack(fill="x", pady=(6, 0))
+        ctk.CTkLabel(modo_card, text=_("modo_timer"), font=("Segoe UI", 9, "bold"),
+                     text_color=C.TEXT_DIM).pack(anchor="w", padx=14, pady=(8, 4))
         for val, lbl in [("normal", _("modo_normal")),
                          ("pomodoro", _("modo_pomodoro"))]:
-            _radio(modo_card, lbl, self.v_modo, val).pack(anchor="w", padx=14, pady=2)
-        tk.Label(modo_card, text="Pomodoro: 25 min trabajo / 5 min pausa",
-                 font=("Segoe UI", 7), bg=BG2, fg=TEXT_DIM).pack(anchor="w", padx=14, pady=(0, 8))
+            _radio(modo_card, lbl, self.v_modo, val).pack(anchor="w", padx=14, pady=1)
+        ctk.CTkLabel(modo_card, text=_("pomodoro_desc"),
+                     font=("Segoe UI", 7), text_color=C.TEXT_MUTED).pack(anchor="w", padx=14, pady=(0, 6))
 
         # ── TAB 2: Opciones ──
-        t2 = self._tab(nb, _("config_opciones"))
-        _subheading(t2, text="No molestar").pack(anchor="w", pady=(4, 2))
-        nm_card = _card(t2)
-        nm_card.pack(fill="x")
-        self.v_nm = tk.BooleanVar(value=self.cfg.get("no_molestar", True))
-        self.v_fs = tk.BooleanVar(value=self.cfg.get("fin_de_semana", False))
-        _checkbox(nm_card, _("no_molestar"), self.v_nm).pack(anchor="w", padx=10, pady=5)
-        _checkbox(nm_card, _("fin_de_semana_opt"), self.v_fs).pack(anchor="w", padx=10, pady=(0, 5))
+        opts = _card(t2)
+        opts.pack(fill="x", pady=(4, 0))
+        self.v_nm = ctk.BooleanVar(value=self.cfg.get("no_molestar", True))
+        self.v_fs = ctk.BooleanVar(value=self.cfg.get("fin_de_semana", False))
+        _checkbox(opts, _("no_molestar"), self.v_nm).pack(anchor="w", padx=10, pady=4)
+        _checkbox(opts, _("fin_de_semana_opt"), self.v_fs).pack(anchor="w", padx=10, pady=(0, 4))
 
-        _subheading(t2, text="Recordatorio de agua").pack(anchor="w", pady=(10, 2))
-        agua_card = _card(t2)
-        agua_card.pack(fill="x")
-        self.v_agua = tk.BooleanVar(value=self.cfg.get("agua_activo", True))
-        self.v_agua_min = tk.StringVar(value=str(self.cfg.get("agua_min", 30)))
-        _checkbox(agua_card, "Activar recordatorio de hidratación", self.v_agua).pack(
-            anchor="w", padx=10, pady=5)
-        row_agua = tk.Frame(agua_card, bg=BG2)
-        row_agua.pack(fill="x", padx=10, pady=(0, 8))
-        tk.Label(row_agua, text="Cada cuantos minutos:", font=("Segoe UI", 9),
-                 bg=BG2, fg=TEXT_DIM).pack(side="left")
-        _entry(row_agua, self.v_agua_min, width=5).pack(side="left", padx=8)
+        agua = _card(t2)
+        agua.pack(fill="x", pady=(6, 0))
+        self.v_agua = ctk.BooleanVar(value=self.cfg.get("agua_activo", True))
+        self.v_agua_min = ctk.StringVar(value=str(self.cfg.get("agua_min", 30)))
+        _checkbox(agua, _("chk_activar_agua"), self.v_agua).pack(anchor="w", padx=10, pady=4)
+        row_agua = ctk.CTkFrame(agua, fg_color="transparent")
+        row_agua.pack(fill="x", padx=10, pady=(0, 6))
+        ctk.CTkLabel(row_agua, text=_("field_agua_intervalo"), font=("Segoe UI", 9),
+                     text_color=C.TEXT_MUTED).pack(side="left")
+        _entry(row_agua, self.v_agua_min, width=60).pack(side="left", padx=8)
 
-        _subheading(t2, text="General").pack(anchor="w", pady=(10, 2))
-        self.v_snd = tk.BooleanVar(value=self.cfg["sonido"])
-        self.v_auto = tk.BooleanVar(value=get_autoarranque())
-        gen_card = _card(t2)
-        gen_card.pack(fill="x")
-        _checkbox(gen_card, _("sonido_alerta"), self.v_snd).pack(anchor="w", padx=10, pady=4)
-        _checkbox(gen_card, _("autoarranque"), self.v_auto).pack(anchor="w", padx=10, pady=4)
+        gen = _card(t2)
+        gen.pack(fill="x", pady=(6, 0))
+        self.v_snd = ctk.BooleanVar(value=self.cfg["sonido"])
+        self.v_auto = ctk.BooleanVar(value=get_autoarranque())
+        _checkbox(gen, _("sonido_alerta"), self.v_snd).pack(anchor="w", padx=10, pady=4)
+        _checkbox(gen, _("autoarranque"), self.v_auto).pack(anchor="w", padx=10, pady=4)
 
-        _subheading(t2, text="Perfiles").pack(anchor="w", pady=(10, 2))
-        perfil_card = _card(t2)
-        perfil_card.pack(fill="x")
-        self.v_perfil = tk.StringVar(value=self.cfg.get("perfil", "default"))
+        perfil = _card(t2)
+        perfil.pack(fill="x", pady=(6, 0))
+        ctk.CTkLabel(perfil, text=_("section_perfiles"), font=("Segoe UI", 9, "bold"),
+                     text_color=C.TEXT_DIM).pack(anchor="w", padx=10, pady=(8, 4))
+        self.v_perfil = ctk.StringVar(value=self.cfg.get("perfil", "default"))
         for p in self._profiles:
-            _radio(perfil_card, p, self.v_perfil, p).pack(anchor="w", padx=10, pady=2)
+            _radio(perfil, p, self.v_perfil, p).pack(anchor="w", padx=10, pady=1)
 
-        _subheading(t2, text="Idioma").pack(anchor="w", pady=(10, 2))
-        lang_card = _card(t2)
-        lang_card.pack(fill="x")
-        self.v_idioma = tk.StringVar(value=self.cfg.get("idioma", "es"))
-        for val, lbl in [("es", "Español"), ("en", "English")]:
-            _radio(lang_card, lbl, self.v_idioma, val).pack(anchor="w", padx=10, pady=2)
+        lang = _card(t2)
+        lang.pack(fill="x", pady=(6, 0))
+        ctk.CTkLabel(lang, text=_("section_idioma"), font=("Segoe UI", 9, "bold"),
+                     text_color=C.TEXT_DIM).pack(anchor="w", padx=10, pady=(8, 4))
+        self.v_idioma = ctk.StringVar(value=self.cfg.get("idioma", "es"))
+        for val, lbl in [("es", _("idioma_es")), ("en", _("idioma_en"))]:
+            _radio(lang, lbl, self.v_idioma, val).pack(anchor="w", padx=10, pady=1)
 
         # ── TAB 3: Sonido ──
-        t3 = self._tab(nb, _("config_sonido"))
-        _subheading(t3, text="Sonido ambiente durante la pausa").pack(anchor="w", pady=(4, 6))
-        amb_card = _card(t3)
-        amb_card.pack(fill="x")
-        self.v_amb = tk.StringVar(value=self.cfg.get("sonido_ambiente", "ninguno"))
+        amb = _card(t3)
+        amb.pack(fill="x", pady=(4, 0))
+        ctk.CTkLabel(amb, text=_("section_sonido_ambiente"), font=("Segoe UI", 9, "bold"),
+                     text_color=C.TEXT_DIM).pack(anchor="w", padx=12, pady=(8, 4))
+        self.v_amb = ctk.StringVar(value=self.cfg.get("sonido_ambiente", "ninguno"))
         for val, lbl in [("ninguno", _("sin_sonido")), ("lluvia", _("lluvia")),
                          ("naturaleza", _("naturaleza"))]:
-            _radio(amb_card, f"  {lbl}", self.v_amb, val).pack(anchor="w", padx=12, pady=6)
+            _radio(amb, lbl, self.v_amb, val).pack(anchor="w", padx=14, pady=3)
 
-        _subheading(t3, text="Notificaciones").pack(anchor="w", pady=(10, 2))
-        notif_card = _card(t3)
-        notif_card.pack(fill="x")
-        self.v_notif_sound = tk.StringVar(value=self.cfg.get("notificacion_sonido", "default"))
-        self.v_notif_dur = tk.StringVar(value=self.cfg.get("notificacion_duracion", "short"))
-        tk.Label(notif_card, text="Sonido:", font=("Segoe UI", 9),
-                 bg=BG2, fg=TEXT_DIM).pack(anchor="w", padx=10, pady=(8, 2))
+        notif = _card(t3)
+        notif.pack(fill="x", pady=(6, 0))
+        ctk.CTkLabel(notif, text=_("section_notificaciones"), font=("Segoe UI", 9, "bold"),
+                     text_color=C.TEXT_DIM).pack(anchor="w", padx=12, pady=(8, 4))
+        self.v_notif_sound = ctk.StringVar(value=self.cfg.get("notificacion_sonido", "default"))
+        self.v_notif_dur = ctk.StringVar(value=self.cfg.get("notificacion_duracion", "short"))
+        ctk.CTkLabel(notif, text=_("field_sonido_tipo"), font=("Segoe UI", 9),
+                     text_color=C.TEXT_MUTED).pack(anchor="w", padx=14, pady=(4, 2))
         for val, lbl in [("default", "Default"), ("sms", "SMS"), ("mail", "Mail"),
-                         ("reminder", "Recordatorio")]:
-            _radio(notif_card, lbl, self.v_notif_sound, val).pack(anchor="w", padx=10, pady=1)
-        tk.Label(notif_card, text="Duración:", font=("Segoe UI", 9),
-                 bg=BG2, fg=TEXT_DIM).pack(anchor="w", padx=10, pady=(8, 2))
-        for val, lbl in [("short", "Corta"), ("long", "Larga")]:
-            _radio(notif_card, lbl, self.v_notif_dur, val).pack(anchor="w", padx=10, pady=1)
+                         ("reminder", _("agua_recordatorio")), ("critical", _("sonido_critica"))]:
+            _radio(notif, lbl, self.v_notif_sound, val).pack(anchor="w", padx=18, pady=1)
+        ctk.CTkLabel(notif, text=_("field_duracion"), font=("Segoe UI", 9),
+                     text_color=C.TEXT_MUTED).pack(anchor="w", padx=14, pady=(4, 2))
+        for val, lbl in [("short", _("dur_corta")), ("long", _("dur_larga"))]:
+            _radio(notif, lbl, self.v_notif_dur, val).pack(anchor="w", padx=18, pady=1)
 
         # ── TAB 4: Ejercicios ──
-        t4 = self._tab(nb, _("config_ejercicios"))
-        _subheading(t4, text="Marca los ejercicios que quieres incluir:").pack(anchor="w", pady=(0, 6))
         ej_card = _card(t4)
-        ej_card.pack(fill="x")
-        self.ej_vars: dict[str, tk.BooleanVar] = {}
+        ej_card.pack(fill="x", pady=(4, 0))
+        ctk.CTkLabel(ej_card, text=_("section_ejercicios"), font=("Segoe UI", 9, "bold"),
+                     text_color=C.TEXT_DIM).pack(anchor="w", padx=12, pady=(8, 4))
+        self.ej_vars: dict[str, ctk.BooleanVar] = {}
         activos: list[str] = self.cfg.get("ejercicios_activos",
-                                           [e["id"] for e in EJERCICIOS])
+                                            [e["id"] for e in EJERCICIOS])
         for ej in EJERCICIOS:
-            v = tk.BooleanVar(value=ej["id"] in activos)
+            v = ctk.BooleanVar(value=ej["id"] in activos)
             self.ej_vars[ej["id"]] = v
-            r = tk.Frame(ej_card, bg=BG2)
-            r.pack(fill="x", padx=10, pady=3)
+            r = ctk.CTkFrame(ej_card, fg_color="transparent")
+            r.pack(fill="x", padx=10, pady=2)
             _checkbox(r, f"{ej['icono']} {ej['nombre']}", v).pack(side="left")
 
-        _subheading(t4, text="Tema").pack(anchor="w", pady=(10, 2))
         tema_card = _card(t4)
-        tema_card.pack(fill="x")
-        self.v_tema = tk.StringVar(value=self.cfg.get("tema", "oscuro"))
-        for val, lbl in [("oscuro", "🌙 Oscuro"), ("claro", "☀️ Claro")]:
-            _radio(tema_card, lbl, self.v_tema, val).pack(anchor="w", padx=10, pady=2)
+        tema_card.pack(fill="x", pady=(6, 0))
+        ctk.CTkLabel(tema_card, text=_("theme"), font=("Segoe UI", 9, "bold"),
+                     text_color=C.TEXT_DIM).pack(anchor="w", padx=12, pady=(8, 4))
+        self.v_tema = ctk.StringVar(value=self.cfg.get("tema", "oscuro"))
+        for val, lbl in [("oscuro", _("theme_oscuro")), ("claro", _("theme_claro"))]:
+            _radio(tema_card, lbl, self.v_tema, val).pack(anchor="w", padx=14, pady=2)
 
-        self.lbl_err = tk.Label(self, text="", font=("Segoe UI", 9), bg=BG, fg=ACCENT2)
+        self.lbl_err = ctk.CTkLabel(main, text="", font=("Segoe UI", 9), text_color=C.ACCENT2)
         self.lbl_err.pack()
-        ModernButton(self, text=_("guardar"), bg_color=ACCENT, fg_color=BG,
-                     font=("Segoe UI", 10, "bold"), padx=28, pady=8,
-                     command=self._save).pack(pady=(8, 14))
+        ctk.CTkButton(main, text=_("guardar"), fg_color=C.ACCENT, text_color=C.BG,
+                      font=("Segoe UI", 9, "bold"), corner_radius=12,
+                      command=self._save).pack(pady=(6, 12))
 
-    def _validate_positive_ints(self, *values: int) -> None:
-        for v in values:
-            if v <= 0:
-                raise ValueError("Todos los valores deben ser positivos")
+    def _parse_time(self, raw: str, label: str) -> tuple[int, int]:
+        try:
+            h, m = map(int, raw.split(":"))
+            if not (0 <= h < 24 and 0 <= m < 60):
+                raise ValueError
+            return h, m
+        except Exception:
+            raise ValueError(f"{label}: {_('err_hora_invalida')}")
 
     def _save(self) -> None:
         try:
-            iv = int(self.v_int.get())
-            dv = int(self.v_dur.get())
-            pv = int(self.v_pos.get())
-            mv = int(self.v_meta.get())
-            amv = int(self.v_agua_min.get())
-            self._validate_positive_ints(iv, dv, pv, mv, amv)
-            h0, m0 = map(int, self.v_ini.get().split(":"))
-            h1, m1 = map(int, self.v_fin.get().split(":"))
-            if not (0 <= h0 < 24 and 0 <= m0 < 60 and 0 <= h1 < 24 and 0 <= m1 < 60):
-                raise ValueError("Hora inválida")
-            if (h1, m1) <= (h0, m0):
-                raise ValueError("Hora fin debe ser mayor que hora inicio")
+            raw = self.v_int.get().strip()
+            if not raw.isdigit():
+                raise ValueError(_("err_campo_intervalo"))
+            iv = int(raw)
+            raw = self.v_dur.get().strip()
+            if not raw.isdigit():
+                raise ValueError(_("err_campo_duracion"))
+            dv = int(raw)
+            raw = self.v_pos.get().strip()
+            if not raw.isdigit():
+                raise ValueError(_("err_campo_posponer"))
+            pv = int(raw)
+            raw = self.v_meta.get().strip()
+            if not raw.isdigit():
+                raise ValueError(_("err_campo_meta"))
+            mv = int(raw)
+            raw = self.v_agua_min.get().strip()
+            if not raw.isdigit():
+                raise ValueError(_("err_campo_agua"))
+            amv = int(raw)
+            for name, val in [("Intervalo", iv), ("Duración", dv),
+                              ("Posponer", pv), ("Meta", mv), ("Agua (min)", amv)]:
+                if val <= 0:
+                    raise ValueError(f"{name}: {_('err_valor_positivo')}")
+            h0, m0 = self._parse_time(self.v_ini.get(), _("field_hora_inicio"))
+            h1, m1 = self._parse_time(self.v_fin.get(), _("field_hora_fin"))
         except ValueError as e:
-            self.lbl_err.config(text=f"Error: {e}")
-            return
-        except Exception:
-            self.lbl_err.config(text="Revisa los valores ingresados")
+            self.lbl_err.configure(text=f"⚠ {e}")
             return
         activos = [eid for eid, v in self.ej_vars.items() if v.get()]
         if not activos:
-            self.lbl_err.config(text="Selecciona al menos un ejercicio")
+            self.lbl_err.configure(text=_("err_selecciona_ej"))
             return
         set_autoarranque(self.v_auto.get(), self._app_path)
 
-        # Aplicar tema si cambió
         nuevo_tema = self.v_tema.get()
         if nuevo_tema != self.cfg.get("tema"):
             set_theme(nuevo_tema)
 
-        # Aplicar idioma si cambió
         nuevo_idioma = self.v_idioma.get()
         if nuevo_idioma != self.cfg.get("idioma"):
             set_idioma(nuevo_idioma)
@@ -681,7 +673,7 @@ class ConfigWindow(CenteredWindow):
 class WelcomeWindow(CenteredWindow):
     def __init__(
         self,
-        parent: tk.Tk,
+        parent: ctk.CTkBaseClass,
         cfg: dict[str, Any],
         on_finish: Callable[[dict[str, Any]], None],
         app_path: str,
@@ -693,14 +685,15 @@ class WelcomeWindow(CenteredWindow):
         self._app_path: str = app_path
         self._config_saver: Callable[[dict[str, Any]], None] | None = config_saver
         self.step: int = 0
-        self.title("Bienvenido a Pausas Activas")
+        self.title(_("welcome_title"))
         self.attributes("-topmost", True)
+        self.configure(fg_color=C.BG)
         self.protocol("WM_DELETE_WINDOW", self._finish)
         self._build()
         self.center()
 
     def _build(self) -> None:
-        self._frame = tk.Frame(self, bg=BG)
+        self._frame = ctk.CTkFrame(self, fg_color="transparent")
         self._frame.pack(fill="both", expand=True)
         self._show_step()
 
@@ -717,131 +710,122 @@ class WelcomeWindow(CenteredWindow):
         elif self.step == 2:
             self._step_listo()
 
-    def _dots(self, parent: tk.Frame) -> None:
-        f = tk.Frame(parent, bg=BG)
+    def _dots(self, parent: ctk.CTkFrame) -> None:
+        f = ctk.CTkFrame(parent, fg_color="transparent")
         f.pack(pady=(0, 16))
         for i in range(3):
-            color = ACCENT if i == self.step else BG3
-            tk.Label(f, text="●", font=("Segoe UI", 10), bg=BG,
-                     fg=color).pack(side="left", padx=3)
+            color = C.ACCENT if i == self.step else C.TEXT_MUTED
+            ctk.CTkLabel(f, text="\u25cf", font=("Segoe UI", 12),
+                         text_color=color).pack(side="left", padx=4)
 
     def _step_bienvenida(self) -> None:
         f = self._frame
-        # Header
-        hdr = tk.Frame(f, bg=ACCENT, height=56)
-        hdr.pack(fill="x")
-        hdr.pack_propagate(False)
-        tk.Label(hdr, text="👋  Bienvenido", font=("Segoe UI", 14, "bold"),
-                 bg=ACCENT, fg=BG).pack(expand=True)
-
-        tk.Label(f, text=_("bienvenido"), font=("Segoe UI", 15, "bold"),
-                 bg=BG, fg=TEXT).pack(pady=(16, 2))
-        tk.Label(f, text="Tu asistente de bienestar en el trabajo",
-                 font=("Segoe UI", 10), bg=BG, fg=TEXT_DIM).pack(pady=(0, 16))
-        cards = [
-            ("⏱", "Recordatorios automáticos", "Te avisa cada cierto tiempo para que hagas una pausa activa."),
-            ("🏃", "Ejercicios guiados",        "Cuello, espalda, ojos, respiración y más."),
-            ("💧", "Hidratación",               "Recordatorios para que tomes agua regularmente."),
-            ("📊", "Estadísticas",              "Lleva el registro de tus pausas y rachas diarias."),
+        ctk.CTkLabel(f, text=_("welcome_heading"), font=("Segoe UI", 16, "bold"),
+                     text_color=C.TEXT).pack(pady=(20, 2))
+        ctk.CTkLabel(f, text=_("bienvenido"), font=("Segoe UI", 10),
+                     text_color=C.TEXT_DIM).pack(pady=(0, 14))
+        cards: list[tuple[str, str, str]] = [
+            ("\u23f1", _("welcome_card1_title"), _("welcome_card1_desc")),
+            ("\U0001f3c3", _("welcome_card2_title"), _("welcome_card2_desc")),
+            ("\U0001f4a7", _("welcome_card3_title"), _("welcome_card3_desc")),
+            ("\U0001f4ca", _("welcome_card4_title"), _("welcome_card4_desc")),
         ]
         for ico, titulo, desc in cards:
             row = _card(f)
             row.pack(fill="x", padx=24, pady=3)
-            tk.Label(row, text=ico, font=("Segoe UI Emoji", 20), bg=BG2).pack(side="left", padx=(12, 6), pady=8)
-            col = tk.Frame(row, bg=BG2)
-            col.pack(side="left", pady=6)
-            tk.Label(col, text=titulo, font=("Segoe UI", 10, "bold"), bg=BG2, fg=TEXT, anchor="w").pack(anchor="w")
-            tk.Label(col, text=desc, font=("Segoe UI", 9), bg=BG2, fg=TEXT_DIM, anchor="w", wraplength=280).pack(anchor="w")
+            ctk.CTkLabel(row, text=ico, font=("Segoe UI Emoji", 20),
+                         text_color=C.TEXT).pack(side="left", padx=(12, 4), pady=8)
+            col = ctk.CTkFrame(row, fg_color="transparent")
+            col.pack(side="left", pady=4)
+            ctk.CTkLabel(col, text=titulo, font=("Segoe UI", 10, "bold"),
+                         text_color=C.TEXT, anchor="w").pack(anchor="w")
+            ctk.CTkLabel(col, text=desc, font=("Segoe UI", 8),
+                         text_color=C.TEXT_MUTED, anchor="w", wraplength=280).pack(anchor="w")
         self._dots(f)
-        ModernButton(f, text="Siguiente →", bg_color=ACCENT, fg_color=BG,
-                     font=("Segoe UI", 10, "bold"), padx=28, pady=8,
-                     command=self._next).pack(pady=(0, 24))
+        ctk.CTkButton(f, text=_("next_step"), fg_color=C.ACCENT, text_color=C.BG,
+                      font=("Segoe UI", 10, "bold"), corner_radius=12,
+                      command=self._next).pack(pady=(0, 24))
 
     def _step_config(self) -> None:
         f = self._frame
-        hdr = tk.Frame(f, bg=ACCENT, height=48)
-        hdr.pack(fill="x")
-        hdr.pack_propagate(False)
-        tk.Label(hdr, text="⚙️  Configura tu rutina", font=("Segoe UI", 11, "bold"),
-                 bg=ACCENT, fg=BG).pack(expand=True)
-
-        tk.Label(f, text="Puedes cambiar esto después en Configuración",
-                 font=("Segoe UI", 9), bg=BG, fg=TEXT_DIM).pack(pady=(8, 12))
+        ctk.CTkLabel(f, text=_("welcome_step1_heading"), font=("Segoe UI", 14, "bold"),
+                     text_color=C.TEXT).pack(pady=(14, 2))
+        ctk.CTkLabel(f, text=_("welcome_step1_info"),
+                     font=("Segoe UI", 9), text_color=C.TEXT_MUTED).pack(pady=(6, 10))
 
         card_cfg = _card(f)
         card_cfg.pack(fill="x", padx=24)
 
-        self.v_int = tk.StringVar(value=str(self.cfg["intervalo_min"]))
-        self.v_dur = tk.StringVar(value=str(self.cfg["duracion_pausa_min"]))
-        self.v_ini = tk.StringVar(value=self.cfg["hora_inicio"])
-        self.v_fin = tk.StringVar(value=self.cfg["hora_fin"])
-        self.v_meta = tk.StringVar(value=str(self.cfg["meta_pausas"]))
+        self.v_int = ctk.StringVar(value=str(self.cfg["intervalo_min"]))
+        self.v_dur = ctk.StringVar(value=str(self.cfg["duracion_pausa_min"]))
+        self.v_ini = ctk.StringVar(value=self.cfg["hora_inicio"])
+        self.v_fin = ctk.StringVar(value=self.cfg["hora_fin"])
+        self.v_meta = ctk.StringVar(value=str(self.cfg["meta_pausas"]))
 
-        def campo(lbl: str, var: tk.StringVar, row: int) -> None:
-            tk.Label(card_cfg, text=lbl, font=("Segoe UI", 10), bg=BG2,
-                     fg=TEXT_DIM, anchor="w").grid(row=row, column=0, sticky="w", padx=14, pady=7)
+        def campo(lbl: str, var: ctk.Variable, row: int) -> None:
+            ctk.CTkLabel(card_cfg, text=lbl, font=("Segoe UI", 10),
+                         text_color=C.TEXT_MUTED, anchor="w").grid(row=row, column=0, sticky="w", padx=14, pady=7)
             _entry(card_cfg, var).grid(row=row, column=1, padx=14, pady=7, sticky="e")
 
-        campo("Intervalo entre pausas (min)", self.v_int, 0)
-        campo("Duración de la pausa (min)",   self.v_dur, 1)
-        campo("Hora inicio (HH:MM)",          self.v_ini, 2)
-        campo("Hora fin (HH:MM)",             self.v_fin, 3)
-        campo("Meta de pausas diarias",       self.v_meta, 4)
+        campo(_("welcome_field_intervalo"), self.v_int, 0)
+        campo(_("welcome_field_duracion"),   self.v_dur, 1)
+        campo(_("welcome_field_hora_ini"),   self.v_ini, 2)
+        campo(_("welcome_field_hora_fin"),   self.v_fin, 3)
+        campo(_("welcome_field_meta"),       self.v_meta, 4)
 
-        _subheading(f, text="Ejercicios a incluir:").pack(anchor="w", padx=28, pady=(8, 4))
+        ctk.CTkLabel(f, text=_("welcome_ej_subheading"), font=("Segoe UI", 9, "bold"),
+                     text_color=C.TEXT_DIM).pack(anchor="w", padx=28, pady=(6, 4))
         ej_card = _card(f)
         ej_card.pack(fill="x", padx=24)
-        self.ej_vars = {}
-        activos = self.cfg.get("ejercicios_activos", [e["id"] for e in EJERCICIOS])
-        cols = 2
+        self.ej_vars: dict[str, ctk.BooleanVar] = {}
+        activos: list[str] = self.cfg.get("ejercicios_activos", [e["id"] for e in EJERCICIOS])
+        cols: int = 2
         for i, ej in enumerate(EJERCICIOS):
-            v = tk.BooleanVar(value=ej["id"] in activos)
+            v = ctk.BooleanVar(value=ej["id"] in activos)
             self.ej_vars[ej["id"]] = v
             r, c = divmod(i, cols)
             _checkbox(ej_card, f"{ej['icono']} {ej['nombre']}", v).grid(
                 row=r, column=c, sticky="w", padx=10, pady=3)
 
-        self.lbl_err = tk.Label(f, text="", font=("Segoe UI", 9), bg=BG, fg=ACCENT2)
+        self.lbl_err = ctk.CTkLabel(f, text="", font=("Segoe UI", 9), text_color=C.ACCENT2)
         self.lbl_err.pack()
         self._dots(f)
-        bf = tk.Frame(f, bg=BG)
+        bf = ctk.CTkFrame(f, fg_color="transparent")
         bf.pack(pady=(0, 20))
-        ModernButton(bf, text="← Atrás", bg_color=BG3, fg_color=TEXT,
-                     font=("Segoe UI", 10), padx=16, pady=6,
-                     command=self._prev).pack(side="left", padx=4)
-        ModernButton(bf, text="Siguiente →", bg_color=ACCENT, fg_color=BG,
-                     font=("Segoe UI", 10, "bold"), padx=24, pady=6,
-                     command=self._save_and_next).pack(side="left", padx=4)
+        ctk.CTkButton(bf, text=_("back_step"), fg_color=C.BG3, text_color=C.TEXT,
+                      font=("Segoe UI", 10), corner_radius=12,
+                      command=self._prev).pack(side="left", padx=4)
+        ctk.CTkButton(bf, text=_("next_step"), fg_color=C.ACCENT, text_color=C.BG,
+                      font=("Segoe UI", 10, "bold"), corner_radius=12,
+                      command=self._save_and_next).pack(side="left", padx=4)
 
     def _step_listo(self) -> None:
         f = self._frame
-        hdr = tk.Frame(f, bg=GREEN, height=64)
-        hdr.pack(fill="x")
-        hdr.pack_propagate(False)
-        tk.Label(hdr, text="🎉  ¡Todo listo!", font=("Segoe UI", 15, "bold"),
-                 bg=GREEN, fg=BG if BG == "#111827" else "#FFFFFF").pack(expand=True)
-
-        tk.Label(f, text="La app ya está configurada y lista para cuidarte.",
-                 font=("Segoe UI", 10), bg=BG, fg=TEXT_DIM).pack(pady=(16, 16))
+        ctk.CTkLabel(f, text=_("welcome_step2_heading"), font=("Segoe UI", 15, "bold"),
+                     text_color=C.TEXT).pack(pady=(20, 2))
+        ctk.CTkLabel(f, text=_("welcome_step2_info"),
+                     font=("Segoe UI", 10), text_color=C.TEXT_MUTED).pack(pady=(12, 14))
         resumen = _card(f)
         resumen.pack(fill="x", padx=28)
-        items = [
-            ("⏱ Intervalo",  f"Cada {self.cfg['intervalo_min']} min"),
-            ("🕐 Duración",  f"{self.cfg['duracion_pausa_min']} min de pausa"),
-            ("🕗 Horario",   f"{self.cfg['hora_inicio']} a {self.cfg['hora_fin']}"),
-            ("🎯 Meta",      f"{self.cfg['meta_pausas']} pausas por día"),
+        items: list[tuple[str, str]] = [
+            ("\u23f1 " + _("welcome_summary_intervalo"),  _("welcome_summary_intervalo_val").format(min=self.cfg['intervalo_min'])),
+            ("\U0001f550 " + _("welcome_summary_duracion"),  _("welcome_summary_duracion_val").format(min=self.cfg['duracion_pausa_min'])),
+            ("\U0001f557 " + _("welcome_summary_horario"),   f"{self.cfg['hora_inicio']} {_('to')} {self.cfg['hora_fin']}"),
+            ("\U0001f3af " + _("welcome_summary_meta"),      _("welcome_summary_meta_val").format(meta=self.cfg['meta_pausas'])),
         ]
         for lbl, val in items:
-            row = tk.Frame(resumen, bg=BG2)
+            row = ctk.CTkFrame(resumen, fg_color="transparent")
             row.pack(fill="x", padx=14, pady=5)
-            tk.Label(row, text=lbl, font=("Segoe UI", 10), bg=BG2, fg=TEXT_DIM).pack(side="left")
-            tk.Label(row, text=val, font=("Segoe UI", 10, "bold"), bg=BG2, fg=TEXT).pack(side="right")
-        tk.Label(f, text="La app se minimizará a la bandeja del sistema.",
-                 font=("Segoe UI", 9), bg=BG, fg=TEXT_DIM).pack(pady=(10, 4))
+            ctk.CTkLabel(row, text=lbl, font=("Segoe UI", 10),
+                         text_color=C.TEXT_MUTED).pack(side="left")
+            ctk.CTkLabel(row, text=val, font=("Segoe UI", 10, "bold"),
+                         text_color=C.TEXT).pack(side="right")
+        ctk.CTkLabel(f, text=_("welcome_step2_tray_info"),
+                     font=("Segoe UI", 9), text_color=C.TEXT_MUTED).pack(pady=(10, 4))
         self._dots(f)
-        ModernButton(f, text="¡Empezar! 🚀", bg_color=GREEN, fg_color=BG,
-                     font=("Segoe UI", 11, "bold"), padx=32, pady=10,
-                     command=self._finish).pack(pady=(0, 28))
+        ctk.CTkButton(f, text=_("welcome_start"), fg_color=C.GREEN, text_color=C.BG,
+                      font=("Segoe UI", 11, "bold"), corner_radius=12,
+                      command=self._finish).pack(pady=(0, 28))
 
     def _next(self) -> None:
         self.step += 1
@@ -855,29 +839,34 @@ class WelcomeWindow(CenteredWindow):
 
     def _save_and_next(self) -> None:
         try:
-            iv = int(self.v_int.get())
-            dv = int(self.v_dur.get())
-            mv = int(self.v_meta.get())
-            if iv <= 0 or dv <= 0 or mv <= 0:
-                raise ValueError("Los valores deben ser positivos")
+            raw = self.v_int.get().strip()
+            if not raw.isdigit():
+                raise ValueError(_("err_campo_intervalo"))
+            iv = int(raw)
+            raw = self.v_dur.get().strip()
+            if not raw.isdigit():
+                raise ValueError(_("err_campo_duracion"))
+            dv = int(raw)
+            raw = self.v_meta.get().strip()
+            if not raw.isdigit():
+                raise ValueError(_("err_campo_meta"))
+            mv = int(raw)
+            for name, val in [("Intervalo", iv), ("Duración", dv), ("Meta", mv)]:
+                if val <= 0:
+                    raise ValueError(f"{name}: {_('err_valor_positivo')}")
             h0, m0 = map(int, self.v_ini.get().split(":"))
             h1, m1 = map(int, self.v_fin.get().split(":"))
             if not (0 <= h0 < 24 and 0 <= m0 < 60):
-                raise ValueError("Hora inicio inválida")
+                raise ValueError(_("err_hora_inicio"))
             if not (0 <= h1 < 24 and 0 <= m1 < 60):
-                raise ValueError("Hora fin inválida")
-            if (h1, m1) <= (h0, m0):
-                raise ValueError("Hora fin debe ser mayor que hora inicio")
+                raise ValueError(_("err_hora_fin"))
         except ValueError as e:
-            self.lbl_err.config(text=f"Error: {e}")
-            return
-        except Exception:
-            self.lbl_err.config(text="Revisa los valores ingresados")
+            self.lbl_err.configure(text=f"⚠ {e}")
             return
 
         activos = [eid for eid, v in self.ej_vars.items() if v.get()]
         if not activos:
-            self.lbl_err.config(text="Selecciona al menos un ejercicio")
+            self.lbl_err.configure(text=_("err_selecciona_ej"))
             return
 
         self.cfg.update({
@@ -913,7 +902,7 @@ class WelcomeWindow(CenteredWindow):
 class UninstallWindow(CenteredWindow):
     def __init__(
         self,
-        parent: tk.Tk,
+        parent: ctk.CTkBaseClass,
         on_quit: Callable[[], None],
         config_file: str,
         stats_file: str,
@@ -926,51 +915,53 @@ class UninstallWindow(CenteredWindow):
         self._stats_file: str = stats_file
         self._hist_file: str = hist_file
         self._app_dir: str = app_dir
-        self.title("Desinstalar Pausas Activas")
+        self.title(_("uninstall_title"))
         self.attributes("-topmost", True)
+        self.configure(fg_color=C.BG)
         self._build()
         self.center()
         self.protocol("WM_DELETE_WINDOW", self.destroy)
 
     def _build(self) -> None:
-        hdr = tk.Frame(self, bg=ACCENT2, height=56)
-        hdr.pack(fill="x")
-        hdr.pack_propagate(False)
-        tk.Label(hdr, text="🗑️  Desinstalar", font=("Segoe UI", 12, "bold"),
-                 bg=ACCENT2, fg=BG).pack(expand=True)
+        main = _card(self, fg_color=C.BG2)
+        main.pack(fill="both", expand=True, padx=16, pady=16)
 
-        tk.Label(self, text="Esta acción eliminará la configuración de la app y no puede deshacerse.",
-                 font=("Segoe UI", 9), bg=BG, fg=TEXT_DIM, justify="center", wraplength=320).pack(pady=(14, 12))
-        box = _card(self)
-        box.pack(padx=24, fill="x")
-        self.v_autoarranque = tk.BooleanVar(value=True)
-        self.v_datos = tk.BooleanVar(value=True)
-        self.v_accesos = tk.BooleanVar(value=True)
-        self.v_carpeta = tk.BooleanVar(value=True)
-        opciones = [
-            (self.v_autoarranque, "Quitar del autoarranque de Windows"),
-            (self.v_datos,        "Eliminar configuración, estadísticas e historial"),
-            (self.v_accesos,      "Eliminar accesos directos (escritorio / menú Inicio)"),
-            (self.v_carpeta,      "Eliminar carpeta de instalación y archivos"),
+        ctk.CTkLabel(main, text=_("uninstall_heading"), font=("Segoe UI", 14, "bold"),
+                     text_color=C.TEXT).pack(pady=(14, 0))
+
+        ctk.CTkLabel(main, text=_("uninstall_warning"),
+                     font=("Segoe UI", 9), text_color=C.TEXT_MUTED, justify="center",
+                     wraplength=340).pack(pady=(12, 10))
+        box = _card(main)
+        box.pack(fill="x")
+        self.v_autoarranque = ctk.BooleanVar(value=True)
+        self.v_datos = ctk.BooleanVar(value=True)
+        self.v_accesos = ctk.BooleanVar(value=True)
+        self.v_carpeta = ctk.BooleanVar(value=True)
+        opciones: list[tuple[ctk.BooleanVar, str]] = [
+            (self.v_autoarranque, _("uninstall_opt_auto")),
+            (self.v_datos,        _("uninstall_opt_datos")),
+            (self.v_accesos,      _("uninstall_opt_accesos")),
+            (self.v_carpeta,      _("uninstall_opt_carpeta")),
         ]
         for var, texto in opciones:
             _checkbox(box, texto, var).pack(anchor="w", padx=10, pady=5)
-        self.lbl_estado = tk.Label(self, text="", font=("Segoe UI", 9), bg=BG, fg=TEXT_DIM)
+        self.lbl_estado = ctk.CTkLabel(main, text="", font=("Segoe UI", 9), text_color=C.TEXT_MUTED)
         self.lbl_estado.pack(pady=(4, 4))
-        bf = tk.Frame(self, bg=BG)
+        bf = ctk.CTkFrame(main, fg_color="transparent")
         bf.pack(pady=(0, 20))
-        ModernButton(bf, text="Cancelar", bg_color=BG3, fg_color=TEXT,
-                     font=("Segoe UI", 10), padx=18, pady=6,
-                     command=self.destroy).pack(side="left", padx=4)
-        ModernButton(bf, text="Desinstalar", bg_color=ACCENT2, fg_color=BG,
-                     font=("Segoe UI", 10, "bold"), padx=18, pady=6,
-                     command=self._confirmar).pack(side="left", padx=4)
+        ctk.CTkButton(bf, text=_("cancelar"), fg_color=C.BG3, text_color=C.TEXT,
+                      font=("Segoe UI", 10), corner_radius=12,
+                      command=self.destroy).pack(side="left", padx=4)
+        ctk.CTkButton(bf, text=_("uninstall_btn"), fg_color=C.ACCENT2, text_color=C.BG,
+                      font=("Segoe UI", 10, "bold"), corner_radius=12,
+                      command=self._confirmar).pack(side="left", padx=4)
 
     def _confirmar(self) -> None:
         import tkinter.messagebox as mb
         ok: bool = mb.askyesno(
-            "Confirmar desinstalación",
-            "¿Seguro que deseas desinstalar Pausas Activas?\n\nLa aplicación se cerrará al terminar.",
+            _("uninstall_confirm_title"),
+            _("uninstall_confirm_msg"),
             icon="warning",
             parent=self,
         )
@@ -982,14 +973,14 @@ class UninstallWindow(CenteredWindow):
         import tkinter.messagebox as mb
         errores: list[str] = []
         if self.v_autoarranque.get():
-            self.lbl_estado.config(text="Quitando autoarranque...")
+            self.lbl_estado.configure(text=_("uninstall_status_auto"))
             self.update()
             try:
                 set_autoarranque(False, "")
             except Exception as e:
                 errores.append(f"Autoarranque: {e}")
         if self.v_datos.get():
-            self.lbl_estado.config(text="Eliminando datos...")
+            self.lbl_estado.configure(text=_("uninstall_status_datos"))
             self.update()
             for f in [self._config_file, self._stats_file, self._hist_file]:
                 try:
@@ -998,7 +989,7 @@ class UninstallWindow(CenteredWindow):
                 except Exception as e:
                     errores.append(f"Archivo {os.path.basename(f)}: {e}")
         if self.v_accesos.get():
-            self.lbl_estado.config(text="Eliminando accesos directos...")
+            self.lbl_estado.configure(text=_("uninstall_status_accesos"))
             self.update()
             _eliminar_accesos_directos(errores)
         try:
@@ -1011,15 +1002,22 @@ class UninstallWindow(CenteredWindow):
                 _programar_borrado_carpeta(install_dir)
         if errores:
             mb.showwarning(
-                "Desinstalación con advertencias",
-                "Se completó con algunos errores:\n\n" + "\n".join(errores),
+                _("uninstall_warn_title"),
+                _("uninstall_warn_msg") + "\n" + "\n".join(errores),
                 parent=self,
             )
         else:
             mb.showinfo(
-                "Desinstalación completa",
-                "Pausas Activas ha sido desinstalado correctamente.",
+                _("uninstall_ok_title"),
+                _("uninstall_ok_msg"),
                 parent=self,
             )
         self.destroy()
         self.on_quit()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Alias backward-compatible
+# ═══════════════════════════════════════════════════════════════════════════
+
+PausaWindow = BreakWindow

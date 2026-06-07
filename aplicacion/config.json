@@ -1,6 +1,6 @@
 {
-  "intervalo_min": 15,
-  "duracion_pausa_min": 2,
+  "intervalo_min": 45,
+  "duracion_pausa_min": 5,
   "hora_inicio": "08:00",
   "hora_fin": "18:00",
   "ejercicios_activos": [
@@ -11,24 +11,23 @@
     "manos",
     "sentad",
     "respira",
+    "caminar",
     "postura"
   ],
   "sonido": true,
   "posponer_min": 10,
   "autoarranque": false,
   "meta_pausas": 6,
-  "no_molestar": false,
+  "no_molestar": true,
   "agua_activo": true,
   "agua_min": 30,
-  "fin_de_semana": true,
-  "sonido_ambiente": "lluvia",
+  "fin_de_semana": false,
+  "sonido_ambiente": "ninguno",
   "primera_vez": false,
   "tema": "oscuro",
   "modo": "normal",
   "perfil": "default",
   "idioma": "es",
   "notificacion_sonido": "default",
-  "notificacion_duracion": "short",
-  "tts_activo": false,
-  "sonidos_personalizados": false
+  "notificacion_duracion": "short"
 }

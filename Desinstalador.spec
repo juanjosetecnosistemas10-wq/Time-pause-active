@@ -5,7 +5,9 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=[],
+    hiddenimports=[
+        'winreg',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -21,7 +23,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='Desinstalador',
+    name='Desinstalador_FlowBreak',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -34,5 +36,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['PausasActivas.ico'],
+    icon=['FlowBreak.ico'],
 )

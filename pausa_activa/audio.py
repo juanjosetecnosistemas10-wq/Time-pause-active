@@ -17,9 +17,12 @@ class AudioManager:
     def __init__(self) -> None:
         self._ambient_dir: str = os.path.join(
             os.environ.get("TEMP", os.path.expanduser("~")),
-            ".pausas_activas_audio",
+            ".flowbreak_audio",
         )
         self._lock: threading.Lock = threading.Lock()
+        self._sounds_dir: str = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "sounds"
+        )
 
     def _generar_wav_lluvia(self, path: str, duracion_seg: int = 30) -> None:
         import math
@@ -58,6 +61,9 @@ class AudioManager:
                 wf.writeframes(struct.pack("<h", sample))
 
     def _get_ambient_wav(self, tipo: str) -> str:
+        external: str = os.path.join(self._sounds_dir, f"{tipo}.wav")
+        if os.path.exists(external):
+            return external
         os.makedirs(self._ambient_dir, exist_ok=True)
         path: str = os.path.join(self._ambient_dir, f"{tipo}.wav")
         if not os.path.exists(path):

@@ -1,7 +1,6 @@
 from pausa_activa.constants import (
-    DEFAULT_CONFIG, EJERCICIOS, FRASES,
-    BG, ACCENT, GREEN,
-    THEMES, set_theme, get_theme, I18N, set_idioma, _,
+    DEFAULT_CONFIG, EJERCICIOS, get_random_phrase,
+    C, THEMES, set_theme, get_theme, I18N, set_idioma, _,
     load_ejercicios_from_file,
 )
 import tempfile
@@ -30,14 +29,15 @@ def test_ejercicios_have_required_fields():
         assert len(ej["pasos"]) > 0
 
 
-def test_frases_not_empty():
-    assert len(FRASES) > 0
+def test_get_random_phrase():
+    phrase = get_random_phrase()
+    assert isinstance(phrase, str) and len(phrase) > 0
 
 
 def test_color_constants_defined():
-    assert BG.startswith("#")
-    assert ACCENT.startswith("#")
-    assert GREEN.startswith("#")
+    assert C.BG.startswith("#")
+    assert C.ACCENT.startswith("#")
+    assert C.GREEN.startswith("#")
 
 
 def test_themes():
@@ -55,9 +55,9 @@ def test_i18n():
     assert "es" in I18N
     assert "en" in I18N
     set_idioma("en")
-    assert _("bienvenido") == "Welcome to Active Breaks!"
+    assert _("bienvenido") == "Welcome to FlowBreak!"
     set_idioma("es")
-    assert _("bienvenido") == "¡Bienvenido a Pausas Activas!"
+    assert _("bienvenido") == "¡Bienvenido a FlowBreak!"
 
 
 def test_i18n_fallback():
