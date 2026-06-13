@@ -14,7 +14,7 @@ from typing import Any, Callable
 from pausa_activa.constants import (
     C, APP_NAME, APP_DISPLAY, __version__, UPDATER_REPO,
     EJERCICIOS, set_theme, set_idioma, get_random_phrase,
-    darken_color,
+    darken_color, F, set_font_size,
     _,
     log, center_window,
 )
@@ -25,7 +25,7 @@ from pausa_activa.notifications import send_win_notification
 from pausa_activa.installer import InstallerWindow, _is_installed
 from pausa_activa.windows import (
     PausaWindow, StatsWindow, ConfigWindow, WelcomeWindow, UninstallWindow,
-    audio_manager,
+    draw_bar_chart, audio_manager,
 )
 
 try:
@@ -161,8 +161,9 @@ class App(ctk.CTk):
         self._update_info: dict[str, Any] | None = None
         self._pending_restart: bool = False
 
-        set_theme(self.cfg.get("tema", "oscuro"))
+        set_theme(self.cfg.get("tema", "oscuro"), self.cfg.get("color_acento", "azul"), self.cfg.get("fondo", "estandar"))
         set_idioma(self.cfg.get("idioma", "es"))
+        set_font_size(self.cfg.get("tamano_letra", "normal"))
 
         self.title(APP_DISPLAY)
         self.configure(fg_color=C.BG)
@@ -267,8 +268,9 @@ class App(ctk.CTk):
         self._start_main()
 
     def _start_main(self) -> None:
+        set_font_size(self.cfg.get("tamano_letra", "normal"))
         self._build()
-        self.deiconify()
+        self._fade_in()
         self._center()
         self._tick()
         self.protocol("WM_DELETE_WINDOW", self._hide)
@@ -340,21 +342,22 @@ class App(ctk.CTk):
     # ── UI ────────────────────────────────────────────────────────────────────
 
     def _build(self) -> None:
+        self.minsize(380, 520)
         # Minimal title bar
         title_frame = ctk.CTkFrame(self, fg_color="transparent")
         title_frame.pack(fill="x", padx=24, pady=(16, 0))
 
-        dot = ctk.CTkLabel(title_frame, text="●", font=("Segoe UI", 9), text_color=C.GREEN)
+        dot = ctk.CTkLabel(title_frame, text="●", font=F(9), text_color=C.GREEN)
         dot.pack(side="left", padx=(0, 6))
 
         ctk.CTkLabel(
             title_frame, text=APP_DISPLAY,
-            font=("Segoe UI", 13, "bold"), text_color=C.TEXT,
+            font=F(13, "bold"), text_color=C.TEXT,
         ).pack(side="left")
 
         ctk.CTkLabel(
             title_frame, text="· " + _("pausa_activa"),
-            font=("Segoe UI", 9), text_color=C.TEXT_DIM,
+            font=F(9), text_color=C.TEXT_DIM,
         ).pack(side="left", padx=(4, 0))
 
         btn_frame = ctk.CTkFrame(title_frame, fg_color="transparent")
@@ -363,20 +366,20 @@ class App(ctk.CTk):
         ctk.CTkButton(
             btn_frame, text="⚙", width=28, height=28,
             fg_color="transparent", text_color=C.TEXT_DIM, hover_color=C.BG3,
-            font=("Segoe UI", 12), corner_radius=14,
+            font=F(12), corner_radius=14,
             command=self._open_config,
         ).pack(side="left", padx=(0, 2))
 
         ctk.CTkButton(
             btn_frame, text="📊", width=28, height=28,
             fg_color="transparent", text_color=C.TEXT_DIM, hover_color=C.BG3,
-            font=("Segoe UI", 12), corner_radius=14,
+            font=F(12), corner_radius=14,
             command=self._open_stats,
         ).pack(side="left")
 
         # Status text — single line
         self.lbl_st = ctk.CTkLabel(
-            self, text=_("trabajando"), font=("Segoe UI", 10),
+            self, text=_("trabajando"), font=F(10),
             text_color=C.TEXT_DIM, fg_color="transparent",
         )
         self.lbl_st.pack(pady=(10, 0))
@@ -384,7 +387,7 @@ class App(ctk.CTk):
         self.badge_frame = ctk.CTkFrame(self, fg_color=C.GREEN, corner_radius=14)
         self.badge_frame.pack(pady=(4, 0))
         self.lbl_badge = ctk.CTkLabel(
-            self.badge_frame, text=_("badge_activo"), font=("Segoe UI", 8, "bold"),
+            self.badge_frame, text=_("badge_activo"), font=F(8, "bold"),
             text_color=C.BG,
         )
         self.lbl_badge.pack(padx=18, pady=3)
@@ -406,7 +409,7 @@ class App(ctk.CTk):
         )
         self._canvas.create_text(
             90, 88, text="00:00",
-            font=("Segoe UI", 30, "bold"),
+            font=F(30, "bold"),
             fill=C.ACCENT, tags="cd_text",
         )
 
@@ -421,7 +424,7 @@ class App(ctk.CTk):
 
         # Update notification
         self.lbl_update = ctk.CTkLabel(
-            self, text="", font=("Segoe UI", 9, "bold"),
+            self, text="", font=F(9, "bold"),
             text_color=C.YELLOW, fg_color="transparent",
             cursor="hand2",
         )
@@ -429,36 +432,36 @@ class App(ctk.CTk):
 
         # Stats
         self.lbl_stats = ctk.CTkLabel(
-            self, text="", font=("Segoe UI", 10),
+            self, text="", font=F(10),
             text_color=C.TEXT_DIM, fg_color="transparent",
         )
         self.lbl_stats.pack(pady=(10, 0))
 
         self.lbl_meta = ctk.CTkLabel(
-            self, text="", font=("Segoe UI", 9, "bold"),
+            self, text="", font=F(9, "bold"),
             text_color=C.TEXT_DIM, fg_color="transparent",
         )
         self.lbl_meta.pack()
 
         # Weekly mini chart
         chart_card = ctk.CTkFrame(self, fg_color=C.BG2, corner_radius=12)
-        chart_card.pack(fill="x", padx=36, pady=(4, 0))
+        chart_card.pack(fill="x", padx=24, pady=(6, 0))
         self._week_canvas = Canvas(
-            chart_card, width=240, height=36,
+            chart_card, width=280, height=80,
             bg=C.BG2, highlightthickness=0,
         )
-        self._week_canvas.pack(padx=10, pady=(2, 6))
+        self._week_canvas.pack(padx=8, pady=(4, 8))
 
         # Infobar: agua + cfg
         bar = ctk.CTkFrame(self, fg_color="transparent")
         bar.pack(pady=(4, 0))
         self.lbl_agua = ctk.CTkLabel(
-            bar, text="", font=("Segoe UI", 8),
+            bar, text="", font=F(8),
             text_color=C.AGUA, fg_color="transparent",
         )
         self.lbl_agua.pack(side="left", padx=4)
         self.lbl_cfg = ctk.CTkLabel(
-            bar, text="", font=("Segoe UI", 8),
+            bar, text="", font=F(8),
             text_color=C.TEXT_DIM, fg_color="transparent",
         )
         self.lbl_cfg.pack(side="left", padx=4)
@@ -472,7 +475,7 @@ class App(ctk.CTk):
         bf.pack(pady=(8, 4))
 
         self.btn_p = ctk.CTkButton(
-            bf, text=_("btn_pausar"), font=("Segoe UI", 10),
+            bf, text=_("btn_pausar"), font=F(10),
             fg_color=C.BG3, text_color=C.TEXT, hover_color=C.BG4,
             width=90, height=32, corner_radius=16, border_width=0,
             command=self._toggle,
@@ -480,14 +483,14 @@ class App(ctk.CTk):
         self.btn_p.pack(side="left", padx=3)
 
         ctk.CTkButton(
-            bf, text="▶ " + _("pausa_ya"), font=("Segoe UI", 10),
+            bf, text="▶ " + _("pausa_ya"), font=F(10),
             fg_color=C.ACCENT, text_color=C.BG, hover_color=darken_color(C.ACCENT),
             width=90, height=32, corner_radius=16, border_width=0,
             command=self._now,
         ).pack(side="left", padx=3)
 
         ctk.CTkButton(
-            bf, text="⏰ " + _("posponer"), font=("Segoe UI", 10),
+            bf, text="⏰ " + _("posponer"), font=F(10),
             fg_color=C.BG3, text_color=C.TEXT, hover_color=C.BG4,
             width=90, height=32, corner_radius=16, border_width=0,
             command=self._posponer,
@@ -495,9 +498,10 @@ class App(ctk.CTk):
 
         # Minimize
         ctk.CTkButton(
-            self, text=_("minimizar"), font=("Segoe UI", 8),
+            self, text=_("minimizar"), font=F(8),
             fg_color="transparent", text_color=C.TEXT_DIM,
             hover_color=C.BG3, corner_radius=8, width=60, height=22,
+            cursor="hand2",
             command=self._hide,
         ).pack(pady=(2, 8))
 
@@ -536,10 +540,6 @@ class App(ctk.CTk):
         canvas = getattr(self, "_week_canvas", None)
         if not canvas:
             return
-        canvas.delete("all")
-        h, w = 36, 240
-        bar_w = 22
-        gap = 10
         from datetime import datetime, timedelta
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         counts: dict[str, int] = {}
@@ -555,29 +555,19 @@ class App(ctk.CTk):
                     counts[day] = counts.get(day, 0) + 1
             except ValueError:
                 pass
+        draw_bar_chart(
+            canvas, 280, 80, counts,
+            self.cfg.get("meta_pausas", 4),
+        )
 
-        # Baseline
-        baseline_y = h - 2
-        canvas.create_line(0, baseline_y, w, baseline_y, fill=C.BORDER, width=1)
-
-        max_c = max(counts.values()) if counts else 1
-        meta = self.cfg.get("meta_pausas", 4)
-        for i in range(7):
-            d = today - timedelta(6 - i)
-            key = d.strftime("%Y-%m-%d")
-            x = 8 + i * (bar_w + gap)
-            val = counts.get(key, 0)
-            bar_h = max(2, (val / max_c) * (h - 12)) if max_c else 2
-            color = C.GREEN if val >= meta else (C.YELLOW if val >= meta // 2 else C.TEXT_DIM)
-            canvas.create_rectangle(
-                x, baseline_y - bar_h, x + bar_w, baseline_y,
-                fill=color, outline="", width=0,
-            )
-            canvas.create_text(
-                x + bar_w // 2, baseline_y + 6,
-                text=["Lu","Ma","Mi","Ju","Vi","Sá","Do"][d.weekday()],
-                fill=C.TEXT_DIM, font=("Segoe UI", 6),
-            )
+    def _fade_in(self) -> None:
+        try:
+            self.attributes("-alpha", 0.0)
+            self.deiconify()
+            for i in range(1, 11):
+                self.after(i * 15, lambda v=i / 10: self.attributes("-alpha", v))
+        except Exception:
+            self.deiconify()
 
     def _center(self) -> None:
         center_window(self)
@@ -938,11 +928,14 @@ class App(ctk.CTk):
     def _open_config(self) -> None:
         def on_save(c: dict[str, Any]) -> None:
             old_tema = self.cfg.get("tema")
+            old_font = self.cfg.get("tamano_letra")
             self.cfg = c
             self._total_sec = c["intervalo_min"] * 60
             self.remaining = self._total_sec
             self._cfg_mgr.save_config(c)
-            if c.get("tema") != old_tema:
+            if c.get("tema") != old_tema or c.get("tamano_letra") != old_font or c.get("color_acento") != self.cfg.get("color_acento"):
+                if c.get("tamano_letra") != old_font:
+                    set_font_size(c.get("tamano_letra", "normal"))
                 self._reapply_theme()
             else:
                 self._update_cfg_label()

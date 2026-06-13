@@ -124,6 +124,30 @@ THEMES: dict[str, dict[str, Any]] = {
     },
 }
 
+# ── Paletas de acento ──────────────────────────────────────────────────────
+
+ACCENT_PALETTES: dict[str, dict[str, Any]] = {
+    "azul":    {"ACCENT": "#38BDF8", "TRAY_ACTIVE": (56, 189, 248)},
+    "verde":   {"ACCENT": "#34D399", "TRAY_ACTIVE": (52, 211, 153)},
+    "morado":  {"ACCENT": "#A78BFA", "TRAY_ACTIVE": (167, 139, 250)},
+    "rosa":    {"ACCENT": "#F472B6", "TRAY_ACTIVE": (244, 114, 182)},
+    "naranja": {"ACCENT": "#FB923C", "TRAY_ACTIVE": (251, 146, 60)},
+    "teal":    {"ACCENT": "#2DD4BF", "TRAY_ACTIVE": (45, 212, 191)},
+    "rojo":    {"ACCENT": "#F87171", "TRAY_ACTIVE": (248, 113, 113)},
+}
+
+# ── Paletas de fondo ───────────────────────────────────────────────────────
+
+FONDO_PALETTES: dict[str, dict[str, str]] = {
+    "estandar":   {},
+    "profundo":   {"BG": "#08080A", "BG2": "#121316", "BG3": "#202126", "CARD": "#121316"},
+    "gris":       {"BG": "#161618", "BG2": "#202124", "BG3": "#2E2F34", "CARD": "#202124"},
+    "azulado":    {"BG": "#0D1117", "BG2": "#161B22", "BG3": "#21262D", "CARD": "#161B22"},
+    "blanco":     {"BG": "#FFFFFF", "BG2": "#F8F8FA", "BG3": "#EEEEF2", "CARD": "#F8F8FA"},
+    "gris_suave": {"BG": "#E8E8EC", "BG2": "#DDDDE1", "BG3": "#D0D0D5", "CARD": "#FFFFFF"},
+    "calido":     {"BG": "#FAF5F0", "BG2": "#F0EBE6", "BG3": "#E5E0DB", "CARD": "#FFFFFF"},
+}
+
 _tema_actual: str = "oscuro"
 
 
@@ -140,12 +164,18 @@ C = _Colors()
 C.load("oscuro")
 
 
-def set_theme(nombre: str) -> None:
+def set_theme(nombre: str, acento: str = "azul", fondo: str = "estandar") -> None:
     global _tema_actual
     if nombre not in THEMES:
         return
     _tema_actual = nombre
     C.load(nombre)
+    paleta = ACCENT_PALETTES.get(acento, ACCENT_PALETTES["azul"])
+    for k, v in paleta.items():
+        setattr(C, k, v)
+    fondos = FONDO_PALETTES.get(fondo, {})
+    for k, v in fondos.items():
+        setattr(C, k, v)
     try:
         import customtkinter as ctk
         if nombre == "oscuro":
@@ -198,6 +228,31 @@ log = logging.getLogger("FlowBreak")
 
 # ── Config por defecto ─────────────────────────────────────────────────────
 
+# ── Font scaling ──────────────────────────────────────────────────────────
+
+FONT_MULTIPLIERS: dict[str, float] = {
+    "pequeno": 0.85,
+    "normal": 1.0,
+    "grande": 1.15,
+    "muy_grande": 1.3,
+}
+
+_font_mult: float = 1.0
+
+
+def set_font_size(key: str) -> None:
+    global _font_mult
+    _font_mult = FONT_MULTIPLIERS.get(key, 1.0)
+
+
+def F(size: int, weight: str = "") -> tuple:
+    """Return a Segoe UI font tuple scaled by the current multiplier."""
+    scaled = max(1, int(size * _font_mult))
+    if weight:
+        return ("Segoe UI", scaled, weight)
+    return ("Segoe UI", scaled)
+
+
 DEFAULT_CONFIG: dict[str, Any] = {
     "intervalo_min": 45,
     "duracion_pausa_min": 5,
@@ -220,6 +275,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "idioma": "es",
     "notificacion_sonido": "default",
     "notificacion_duracion": "short",
+    "tamano_letra": "normal",
+    "color_acento": "azul",
+    "fondo": "estandar",
 }
 
 # ── Ejercicios ─────────────────────────────────────────────────────────────
@@ -410,6 +468,22 @@ I18N: dict[str, dict[str, Any]] = {
         "section_ejercicios": "Marca los ejercicios que quieres incluir:",
         "theme_oscuro": "Oscuro",
         "theme_claro": "Claro",
+        "section_accent_color": "Color de acento",
+        "accent_azul": "Azul",
+        "accent_verde": "Verde",
+        "accent_morado": "Púrpura",
+        "accent_rosa": "Rosa",
+        "accent_naranja": "Naranja",
+        "accent_teal": "Teal",
+        "accent_rojo": "Rojo",
+        "section_fondo": "Fondo",
+        "fondo_estandar": "Estándar",
+        "fondo_profundo": "Profundo",
+        "fondo_gris": "Gris",
+        "fondo_azulado": "Azulado",
+        "fondo_blanco": "Blanco",
+        "fondo_gris_suave": "Gris suave",
+        "fondo_calido": "Cálido",
         # StatsWindow
         "stats_completadas": "Pausas completadas",
         "stats_saltadas": "Pausas saltadas",
@@ -508,6 +582,12 @@ I18N: dict[str, dict[str, Any]] = {
         "uninstall_warn_msg": "Se completó con algunos errores:\n\n",
         "uninstall_ok_title": "Desinstalación completa",
         "uninstall_ok_msg": "FlowBreak ha sido desinstalado correctamente.",
+        # Tamaño de letra
+        "section_font_size": "Tamaño de letra",
+        "font_pequeno": "Pequeño",
+        "font_normal": "Normal",
+        "font_grande": "Grande",
+        "font_muy_grande": "Muy grande",
         # Frases motivacionales
         "frases": [
             "¡Excelente! Tu cuerpo te lo agradece.",
@@ -680,6 +760,22 @@ I18N: dict[str, dict[str, Any]] = {
         "section_ejercicios": "Select exercises to include:",
         "theme_oscuro": "Dark",
         "theme_claro": "Light",
+        "section_accent_color": "Accent color",
+        "accent_azul": "Blue",
+        "accent_verde": "Green",
+        "accent_morado": "Purple",
+        "accent_rosa": "Pink",
+        "accent_naranja": "Orange",
+        "accent_teal": "Teal",
+        "accent_rojo": "Red",
+        "section_fondo": "Background",
+        "fondo_estandar": "Standard",
+        "fondo_profundo": "Deep",
+        "fondo_gris": "Gray",
+        "fondo_azulado": "Blueish",
+        "fondo_blanco": "White",
+        "fondo_gris_suave": "Soft gray",
+        "fondo_calido": "Warm",
         # StatsWindow
         "stats_completadas": "Completed breaks",
         "stats_saltadas": "Skipped breaks",
@@ -778,6 +874,12 @@ I18N: dict[str, dict[str, Any]] = {
         "uninstall_warn_msg": "Completed with some errors:\n\n",
         "uninstall_ok_title": "Uninstall complete",
         "uninstall_ok_msg": "FlowBreak has been uninstalled successfully.",
+        # Font size
+        "section_font_size": "Font size",
+        "font_pequeno": "Small",
+        "font_normal": "Normal",
+        "font_grande": "Large",
+        "font_muy_grande": "Extra large",
         # Motivational phrases
         "frases": [
             "Excellent! Your body thanks you.",

@@ -13,8 +13,10 @@ import winreg
 from tkinter import ttk
 from typing import Callable
 
+import customtkinter as ctk
+
 from pausa_activa.constants import (
-    C, APP_DISPLAY, APP_NAME, INSTALL_DIR_REG, _, log, center_window,
+    C, APP_DISPLAY, APP_NAME, INSTALL_DIR_REG, _, log, center_window, darken_color, F,
 )
 
 
@@ -118,39 +120,51 @@ def _quitar_registro_desinstalador() -> None:
         pass
 
 
-class InstallerWindow(tk.Toplevel):
-    def __init__(self, parent: tk.Tk, on_finish: Callable[[str], None], app_path: str, programs_dir: str) -> None:
+class InstallerWindow(ctk.CTkToplevel):
+    def __init__(self, parent: ctk.CTkBaseClass, on_finish: Callable[[str], None], app_path: str, programs_dir: str) -> None:
         super().__init__(parent)
         self.on_finish: Callable[[str], None] = on_finish
         self._app_path: str = app_path
         self._programs_dir: str = programs_dir
         self._install_dir: tk.StringVar = tk.StringVar(value=programs_dir)
         self.title(_("install_title"))
-        self.configure(bg=C.BG)
+        self.configure(fg_color=C.BG)
         self.resizable(False, False)
         self.attributes("-topmost", True)
         self._build()
         self._center()
+        try:
+            self.attributes("-alpha", 0.0)
+            self.after(10, self._fade_in)
+        except Exception:
+            pass
         self.protocol("WM_DELETE_WINDOW", self._cancelar)
 
+    def _fade_in(self) -> None:
+        try:
+            for i in range(1, 11):
+                self.after(i * 15, lambda v=i / 10: self.attributes("-alpha", v))
+        except Exception:
+            self.attributes("-alpha", 1.0)
+
     def _build(self) -> None:
-        tk.Label(self, text="⚡", font=("Segoe UI Emoji", 40), bg=C.BG).pack(pady=(28, 4))
-        tk.Label(self, text=_("install_title"),
-                 font=("Segoe UI", 15, "bold"), bg=C.BG, fg=C.ACCENT).pack()
-        tk.Label(self, text=_("install_desc"),
-                 font=("Segoe UI", 9), bg=C.BG, fg=C.TEXT_DIM).pack(pady=(4, 18))
-        dir_frame = tk.Frame(self, bg=C.BG2, highlightthickness=1, highlightbackground=C.BORDER)
+        ctk.CTkLabel(self, text="⚡", font=("Segoe UI Emoji", 40),
+                     text_color=C.TEXT).pack(pady=(28, 4))
+        ctk.CTkLabel(self, text=_("install_title"), font=F(15, "bold"),
+                     text_color=C.ACCENT).pack()
+        ctk.CTkLabel(self, text=_("install_desc"), font=F(9),
+                     text_color=C.TEXT_DIM).pack(pady=(4, 18))
+        dir_frame = ctk.CTkFrame(self, fg_color=C.BG2, border_width=1, border_color=C.BORDER)
         dir_frame.pack(padx=28, fill="x")
-        tk.Label(dir_frame, text=_("install_folder_label"), font=("Segoe UI", 9, "bold"),
-                 bg=C.BG2, fg=C.TEXT_DIM).pack(anchor="w", padx=12, pady=(10, 2))
-        tk.Entry(dir_frame, textvariable=self._install_dir, font=("Segoe UI", 9),
-                 bg=C.BG3, fg=C.TEXT, insertbackground=C.TEXT, relief="flat", bd=0,
-                 highlightthickness=1, highlightbackground=C.BORDER, width=46).pack(
-                     padx=12, pady=(0, 10), fill="x")
-        opt_frame = tk.Frame(self, bg=C.BG2, highlightthickness=1, highlightbackground=C.BORDER)
+        ctk.CTkLabel(dir_frame, text=_("install_folder_label"), font=F(9, "bold"),
+                     text_color=C.TEXT_DIM).pack(anchor="w", padx=12, pady=(10, 2))
+        ctk.CTkEntry(dir_frame, textvariable=self._install_dir, font=F(9),
+                     fg_color=C.BG3, text_color=C.TEXT, border_color=C.BORDER, width=46).pack(
+                         padx=12, pady=(0, 10), fill="x")
+        opt_frame = ctk.CTkFrame(self, fg_color=C.BG2, border_width=1, border_color=C.BORDER)
         opt_frame.pack(padx=28, fill="x", pady=14)
-        tk.Label(opt_frame, text=_("install_options_label"), font=("Segoe UI", 9, "bold"),
-                 bg=C.BG2, fg=C.TEXT_DIM).pack(anchor="w", padx=12, pady=(10, 2))
+        ctk.CTkLabel(opt_frame, text=_("install_options_label"), font=F(9, "bold"),
+                     text_color=C.TEXT_DIM).pack(anchor="w", padx=12, pady=(10, 2))
         self.v_escritorio = tk.BooleanVar(value=True)
         self.v_inicio = tk.BooleanVar(value=True)
         self.v_autostart = tk.BooleanVar(value=True)
@@ -159,35 +173,32 @@ class InstallerWindow(tk.Toplevel):
             (self.v_inicio,     _("install_opt_start")),
             (self.v_autostart,  _("install_opt_autostart")),
         ]:
-            tk.Checkbutton(opt_frame, text=txt, variable=var, font=("Segoe UI", 9),
-                           bg=C.BG2, fg=C.TEXT, selectcolor=C.BG3,
-                           activebackground=C.BG2, activeforeground=C.TEXT).pack(anchor="w", padx=10, pady=4)
-        tk.Frame(opt_frame, bg=C.BG2).pack(pady=4)
-        self.pb = ttk.Progressbar(self, orient="horizontal", length=380,
-                                  mode="determinate", maximum=100, value=0)
-        s = ttk.Style(self)
-        s.theme_use("default")
-        s.configure("inst.Horizontal.TProgressbar", troughcolor=C.BG3, background=C.ACCENT,
-                    bordercolor=C.BG3, lightcolor=C.ACCENT, darkcolor=C.ACCENT)
-        self.pb.configure(style="inst.Horizontal.TProgressbar")
+            ctk.CTkCheckBox(opt_frame, text=txt, variable=var, font=F(9),
+                           fg_color=C.ACCENT, text_color=C.TEXT, hover_color=C.ACCENT2,
+                           corner_radius=4, border_width=2, checkmark_color=C.BG).pack(
+                               anchor="w", padx=10, pady=4)
+        self.pb = ctk.CTkProgressBar(self, width=380, height=8, corner_radius=4,
+                                     fg_color=C.BG3, progress_color=C.ACCENT)
         self.pb.pack(padx=28, pady=(0, 4))
         self.pb.pack_forget()
-        self.lbl_estado = tk.Label(self, text="", font=("Segoe UI", 9), bg=C.BG, fg=C.TEXT_DIM)
+        self.lbl_estado = ctk.CTkLabel(self, text="", font=F(9), text_color=C.TEXT_DIM)
         self.lbl_estado.pack()
-        bf = tk.Frame(self, bg=C.BG)
+        bf = ctk.CTkFrame(self, fg_color="transparent")
         bf.pack(pady=(12, 24))
-        tk.Button(bf, text=_("cancelar"), font=("Segoe UI", 10), bg=C.BG3, fg=C.TEXT,
-                  bd=0, cursor="hand2", activebackground=C.BORDER, activeforeground=C.TEXT,
-                  relief="flat", padx=18, pady=8, command=self._cancelar).pack(side="left", padx=6)
-        self.btn = tk.Button(bf, text=_("install"), font=("Segoe UI", 10, "bold"),
-                             bg=C.ACCENT, fg="white", bd=0, cursor="hand2",
-                             activebackground="#5A52D5", activeforeground="white",
-                             relief="flat", padx=24, pady=8, command=self._instalar)
+        ctk.CTkButton(bf, text=_("cancelar"), font=F(10),
+                     fg_color=C.BG3, text_color=C.TEXT, hover_color=C.BG4,
+                     corner_radius=8, width=90, cursor="hand2",
+                     command=self._cancelar).pack(side="left", padx=6)
+        self.btn = ctk.CTkButton(bf, text=_("install"), font=F(10, "bold"),
+                                fg_color=C.ACCENT, text_color=C.BG,
+                                hover_color=darken_color(C.ACCENT),
+                                corner_radius=8, width=90, cursor="hand2",
+                                command=self._instalar)
         self.btn.pack(side="left", padx=6)
 
     def _progress(self, pct: int, msg: str) -> None:
-        self.pb["value"] = pct
-        self.lbl_estado.config(text=msg)
+        self.pb.set(pct / 100.0)
+        self.lbl_estado.configure(text=msg)
         self.update()
 
     def _cancelar(self) -> None:
@@ -205,7 +216,7 @@ class InstallerWindow(tk.Toplevel):
         if not install_dir:
             mb.showerror(_("error"), _("install_err_no_dir"), parent=self)
             return
-        self.btn.config(state="disabled")
+        self.btn.configure(state="disabled")
         self.pb.pack(padx=28, pady=(0, 4))
         try:
             self._progress(10, _("install_progress_dir"))
@@ -248,14 +259,14 @@ class InstallerWindow(tk.Toplevel):
         except PermissionError:
             mb.showerror(_("install_perm_error_title"),
                          _("install_perm_error_msg").format(dir=install_dir), parent=self)
-            self.btn.config(state="normal")
+            self.btn.configure(state="normal")
             self.pb.pack_forget()
-            self.lbl_estado.config(text="")
+            self.lbl_estado.configure(text="")
         except Exception as e:
             mb.showerror(_("error"), str(e), parent=self)
-            self.btn.config(state="normal")
+            self.btn.configure(state="normal")
             self.pb.pack_forget()
-            self.lbl_estado.config(text="")
+            self.lbl_estado.configure(text="")
 
     def _center(self) -> None:
         center_window(self)

@@ -30,5 +30,8 @@
   "notificacion_sonido": "default",
   "notificacion_duracion": "short",
   "tts_activo": false,
-  "sonidos_personalizados": false
+  "sonidos_personalizados": false,
+  "tamano_letra": "grande",
+  "color_acento": "morado",
+  "fondo": "profundo"
 }
