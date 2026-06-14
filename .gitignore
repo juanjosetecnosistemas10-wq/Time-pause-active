@@ -22,3 +22,9 @@ __pycache__/
 # Otros
 desktop.ini
 *.lnk
+
+# Datos personales del usuario
+historial.csv
+stats.json
+config.json
+aplicacion/config.json
