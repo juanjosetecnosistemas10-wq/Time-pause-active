@@ -376,7 +376,7 @@ WELLNESS_NOTES: list[dict[str, str]] = [
     {"icon": "💧", "title": "Hidrátate", "msg": "Tómate un vaso de agua. Tu cuerpo te lo agradecerá."},
     {"icon": "👀", "title": "Descansa la vista", "msg": "Mira algo lejano a 6 metros por 20 segundos."},
     {"icon": "🧍", "title": "Corrige tu postura", "msg": "Espalda recta, hombros relajados, pies en el suelo."},
-    {"icon": "🌞", "title": "Busca luz natural", Si buscas una ventana. La luz natural mejora tu ánimo."},
+    {"icon": "🌞", "title": "Busca luz natural", "msg": "Si buscas una ventana. La luz natural mejora tu ánimo."},
     {"icon": "🧠", "title": "Limpia tu mente", "msg": "Cierra los ojos 30 segundos y piensa en algo que te haga feliz."},
     {"icon": "💪", "title": "Estira tu cuerpo", "msg": "Estira los brazos arriba y mantén 10 segundos."},
     {"icon": "😊", "title": "Sonríe", "msg": "Una sonrisa libera endorfinas. ¡Hazlo ahora!"},

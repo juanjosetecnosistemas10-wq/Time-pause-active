@@ -769,6 +769,11 @@ class App(ctk.CTk):
         self.lbl_meta.configure(text=f"{top}  ·  {challenge_text}", text_color=comp_color)
         self._draw_week_chart()
 
+    def _update_wellness_note(self) -> None:
+        from pausa_activa.constants import WELLNESS_NOTES
+        note = random.choice(WELLNESS_NOTES)
+        self._wellness_label.configure(text=f"{note['icon']} {note['title']}\n{note['msg']}")
+
     def _draw_week_chart(self) -> None:
         canvas = getattr(self, "_week_canvas", None)
         if not canvas:

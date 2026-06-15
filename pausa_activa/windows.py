@@ -1201,9 +1201,10 @@ class ConfigWindow(CenteredWindow):
 
     def _field(self, parent: ctk.CTkFrame, label: str, var: ctk.Variable, row: int) -> None:
         ctk.CTkLabel(parent, text=label, font=F(10),
-                     text_color=C.TEXT_MUTED, anchor="w").grid(
-            row=row, column=0, sticky="w", padx=16, pady=8)
-        _entry(parent, var).grid(row=row, column=1, padx=16, pady=8, sticky="e")
+                     text_color=C.TEXT_MUTED, anchor="w").pack(
+            side="left", padx=16, pady=8)
+        _entry(parent, var).pack(
+            side="right", padx=16, pady=8)
 
     def _build(self) -> None:
         self.configure(fg_color=C.BG)
