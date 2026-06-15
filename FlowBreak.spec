@@ -1,10 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+
 a = Analysis(
     ['pausa_activa.py'],
     pathex=[],
     binaries=[],
-    datas=[('FlowBreak.ico', '.'), ('FlowBreak_256.png', '.'), ('ejercicios.json', '.')],
+    datas=[('FlowBreak.ico', '.'), ('ejercicios.json', '.')],
     hiddenimports=[
         'winotify',
         'pystray',
@@ -37,7 +38,7 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
-    optimize=2,
+    optimize=0,
 )
 pyz = PYZ(a.pure)
 
@@ -49,7 +50,6 @@ exe = EXE(
     [],
     name='FlowBreak',
     debug=False,
-    distpath='aplicacion',
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,

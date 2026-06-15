@@ -21,6 +21,9 @@ from pausa_activa.constants import (
 
 
 def _crear_acceso_directo(target: str, lnk_path: str, icon: str = "") -> None:
+    target_safe = target.replace('"', '`"')
+    lnk_safe = lnk_path.replace('"', '`"')
+    icon_safe = (icon if icon else "").replace('"', '`"')
     ps: list[str] = [
         "powershell", "-NoProfile", "-Command",
         "param($target,$lnk,$icon)\n"
@@ -30,9 +33,9 @@ def _crear_acceso_directo(target: str, lnk_path: str, icon: str = "") -> None:
         "$s.WorkingDirectory=[System.IO.Path]::GetDirectoryName($target)\n"
         "if($icon){$s.IconLocation=$icon}\n"
         "$s.Save()",
-        "-target", target,
-        "-lnk", lnk_path,
-        "-icon", (icon if icon else ""),
+        "-target", target_safe,
+        "-lnk", lnk_safe,
+        "-icon", icon_safe,
     ]
     subprocess.run(ps, capture_output=True, creationflags=0x08000000)
 
@@ -51,14 +54,16 @@ def _validar_install_dir(install_dir: str) -> tuple[bool, str]:
 
 def _registrar_instalacion(install_dir: str, exe_path: str, icon_path: str = "") -> None:
     key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, INSTALL_DIR_REG)
-    winreg.SetValueEx(key, "DisplayName", 0, winreg.REG_SZ, APP_DISPLAY)
-    winreg.SetValueEx(key, "UninstallString", 0, winreg.REG_SZ, f'"{exe_path}" --uninstall')
-    winreg.SetValueEx(key, "DisplayIcon", 0, winreg.REG_SZ, icon_path or exe_path)
-    winreg.SetValueEx(key, "Publisher", 0, winreg.REG_SZ, APP_DISPLAY)
-    winreg.SetValueEx(key, "InstallLocation", 0, winreg.REG_SZ, install_dir)
-    winreg.SetValueEx(key, "NoModify", 0, winreg.REG_DWORD, 1)
-    winreg.SetValueEx(key, "NoRepair", 0, winreg.REG_DWORD, 1)
-    winreg.CloseKey(key)
+    try:
+        winreg.SetValueEx(key, "DisplayName", 0, winreg.REG_SZ, APP_DISPLAY)
+        winreg.SetValueEx(key, "UninstallString", 0, winreg.REG_SZ, f'"{exe_path}" --uninstall')
+        winreg.SetValueEx(key, "DisplayIcon", 0, winreg.REG_SZ, icon_path or exe_path)
+        winreg.SetValueEx(key, "Publisher", 0, winreg.REG_SZ, APP_DISPLAY)
+        winreg.SetValueEx(key, "InstallLocation", 0, winreg.REG_SZ, install_dir)
+        winreg.SetValueEx(key, "NoModify", 0, winreg.REG_DWORD, 1)
+        winreg.SetValueEx(key, "NoRepair", 0, winreg.REG_DWORD, 1)
+    finally:
+        winreg.CloseKey(key)
 
 
 def _get_install_dir_from_registry() -> str:
@@ -103,12 +108,16 @@ def _eliminar_accesos_directos(errores: list[str]) -> None:
 def _programar_borrado_carpeta(folder: str) -> None:
     pid: int = os.getpid()
     bat: str = os.path.join(tempfile.gettempdir(), "pa_cleanup.bat")
+    folder_safe = folder.replace('"', '`"')
     with open(bat, "w", encoding="utf-8") as f:
         f.write("@echo off\n")
         f.write(":loop\n")
-        f.write(f'tasklist /fi "PID eq {pid}" | find "{pid}" >nul 2>&1\n')
-        f.write("if not errorlevel 1 ( timeout /t 1 /nobreak >nul && goto loop )\n")
-        f.write(f'rd /s /q "{folder}" >nul 2>&1\n')
+        f.write(f'tasklist /fi "PID eq {pid}" 2>nul | find "{pid}" >nul 2>&1\n')
+        f.write("if %errorlevel%==0 (\n")
+        f.write("  timeout /t 2 /nobreak >nul\n")
+        f.write("  goto loop\n")
+        f.write(")\n")
+        f.write(f'if exist "{folder_safe}" rd /s /q "{folder_safe}" >nul 2>&1\n')
         f.write('del "%~f0"\n')
     subprocess.Popen(["cmd", "/c", bat], creationflags=0x08000000)
 
@@ -223,12 +232,39 @@ class InstallerWindow(ctk.CTkToplevel):
             os.makedirs(install_dir, exist_ok=True)
             self._progress(25, _("install_progress_files"))
             dest_exe = os.path.join(install_dir, os.path.basename(self._app_path))
-            if os.path.abspath(self._app_path) != os.path.abspath(dest_exe):
-                shutil.copy2(self._app_path, dest_exe)
+            src_exe = os.path.abspath(self._app_path)
+            dst_exe = os.path.abspath(dest_exe)
+            copied_ok = False
+            if src_exe == dst_exe:
+                copied_ok = True
+            else:
+                try:
+                    shutil.copy2(src_exe, dst_exe)
+                    copied_ok = True
+                except PermissionError:
+                    bat = os.path.join(tempfile.gettempdir(), "flowbreak_install_copy.bat")
+                    with open(bat, "w", encoding="utf-8") as f:
+                        f.write("@echo off\n")
+                        f.write(f'copy /y "{src_exe}" "{dst_exe}" >nul 2>&1\n')
+                        f.write('del "%~f0"\n')
+                    subprocess.run(["cmd", "/c", bat],
+                                   creationflags=0x08000000, timeout=10)
+                    if os.path.exists(dst_exe):
+                        copied_ok = True
+                    else:
+                        raise PermissionError(
+                            f"No se pudo copiar el ejecutable a:\n{install_dir}\n\n"
+                            "Cierra FlowBreak si está ejecutando e intenta de nuevo."
+                        )
+            if not copied_ok:
+                raise PermissionError("No se pudo copiar el ejecutable.")
             src_ico = os.path.join(os.path.dirname(self._app_path), "FlowBreak.ico")
             dest_ico = os.path.join(install_dir, "FlowBreak.ico")
             if os.path.exists(src_ico) and os.path.abspath(src_ico) != os.path.abspath(dest_ico):
-                shutil.copy2(src_ico, dest_ico)
+                try:
+                    shutil.copy2(src_ico, dest_ico)
+                except PermissionError:
+                    pass
             if self.v_escritorio.get():
                 self._progress(45, _("install_progress_desktop"))
                 buf = ctypes.create_unicode_buffer(260)
@@ -256,9 +292,9 @@ class InstallerWindow(ctk.CTkToplevel):
             mb.showinfo(_("install_ok_title"), _("install_ok_msg").format(dir=install_dir), parent=self)
             self.destroy()
             self.on_finish(install_dir)
-        except PermissionError:
+        except PermissionError as pe:
             mb.showerror(_("install_perm_error_title"),
-                         _("install_perm_error_msg").format(dir=install_dir), parent=self)
+                         f"{_('install_perm_error_msg').format(dir=install_dir)}\n\n{pe}", parent=self)
             self.btn.configure(state="normal")
             self.pb.pack_forget()
             self.lbl_estado.configure(text="")

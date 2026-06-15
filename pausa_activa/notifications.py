@@ -42,4 +42,4 @@ def send_win_notification(
             return
         except Exception:
             pass
-    log.warning("winotify no disponible, notificación omitida: %s - %s", title, msg)
+    log.debug("Notificación omitida: %s - %s", title, msg)

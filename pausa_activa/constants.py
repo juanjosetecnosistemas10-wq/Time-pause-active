@@ -60,7 +60,7 @@ def center_window(win: Any) -> None:
 APP_NAME: str = "FlowBreak"
 APP_DISPLAY: str = "FlowBreak"
 __version__: str = "2.0.3"
-UPDATER_REPO: str = "tu_usuario/Time-pause-active"
+UPDATER_REPO: str = "juanjosetecnosistemas10-wq/Time-pause-active"
 
 
 def darken_color(hex_color: str, amount: int = 30) -> str:
@@ -75,77 +75,93 @@ INSTALL_DIR_REG: str = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Flo
 
 THEMES: dict[str, dict[str, Any]] = {
     "oscuro": {
-        "BG": "#0B1120",
-        "BG2": "#162032",
-        "BG3": "#1E2D45",
-        "BG4": "#2A3D5C",
-        "ACCENT": "#38BDF8",
-        "ACCENT2": "#FB7185",
-        "ACCENT3": "#A78BFA",
-        "GREEN": "#4ADE80",
-        "YELLOW": "#FBBF24",
-        "TEXT": "#F1F5F9",
-        "TEXT_DIM": "#94A3B8",
-        "TEXT_MUTED": "#64748B",
-        "BORDER": "#1E3A5F",
-        "AGUA": "#22D3EE",
-        "CARD": "#111D33",
-        "CARD_BORDER": "#1A2D4A",
+        "BG": "#0A0E1A",
+        "BG2": "#111827",
+        "BG3": "#1F2937",
+        "BG4": "#374151",
+        "ACCENT": "#3B82F6",
+        "ACCENT2": "#F43F5E",
+        "ACCENT3": "#8B5CF6",
+        "GREEN": "#10B981",
+        "YELLOW": "#F59E0B",
+        "TEXT": "#F9FAFB",
+        "TEXT_DIM": "#9CA3AF",
+        "TEXT_MUTED": "#6B7280",
+        "BORDER": "#1E293B",
+        "AGUA": "#06B6D4",
+        "CARD": "#111827",
+        "CARD_BORDER": "#1E293B",
         "SUCCESS_BG": "#064E3B",
         "WARNING_BG": "#422006",
         "ERROR_BG": "#450A0A",
-        "TRAY_ACTIVE": (56, 189, 248),
-        "TRAY_PAUSED": (148, 163, 184),
-        "TRAY_OFF": (251, 113, 133),
+        "TRAY_ACTIVE": (59, 130, 246),
+        "TRAY_PAUSED": (156, 163, 175),
+        "TRAY_OFF": (244, 63, 94),
+        "GLOW": "#3B82F6",
+        "SURFACE": "#0F172A",
     },
     "claro": {
-        "BG": "#F0F4F8",
+        "BG": "#F8FAFC",
         "BG2": "#FFFFFF",
-        "BG3": "#E2E8F0",
-        "BG4": "#CBD5E1",
-        "ACCENT": "#0284C7",
+        "BG3": "#F1F5F9",
+        "BG4": "#E2E8F0",
+        "ACCENT": "#2563EB",
         "ACCENT2": "#E11D48",
         "ACCENT3": "#7C3AED",
-        "GREEN": "#16A34A",
+        "GREEN": "#059669",
         "YELLOW": "#D97706",
-        "TEXT": "#0B1120",
-        "TEXT_DIM": "#475569",
+        "TEXT": "#0F172A",
+        "TEXT_DIM": "#64748B",
         "TEXT_MUTED": "#94A3B8",
-        "BORDER": "#CBD5E1",
+        "BORDER": "#E2E8F0",
         "AGUA": "#0891B2",
         "CARD": "#FFFFFF",
         "CARD_BORDER": "#E2E8F0",
         "SUCCESS_BG": "#DCFCE7",
         "WARNING_BG": "#FEF3C7",
         "ERROR_BG": "#FEE2E2",
-        "TRAY_ACTIVE": (2, 132, 199),
+        "TRAY_ACTIVE": (37, 99, 235),
         "TRAY_PAUSED": (100, 116, 139),
         "TRAY_OFF": (225, 29, 72),
+        "GLOW": "#2563EB",
+        "SURFACE": "#FFFFFF",
     },
 }
 
 # ── Paletas de acento ──────────────────────────────────────────────────────
 
 ACCENT_PALETTES: dict[str, dict[str, Any]] = {
-    "azul":    {"ACCENT": "#38BDF8", "TRAY_ACTIVE": (56, 189, 248)},
-    "verde":   {"ACCENT": "#34D399", "TRAY_ACTIVE": (52, 211, 153)},
-    "morado":  {"ACCENT": "#A78BFA", "TRAY_ACTIVE": (167, 139, 250)},
-    "rosa":    {"ACCENT": "#F472B6", "TRAY_ACTIVE": (244, 114, 182)},
-    "naranja": {"ACCENT": "#FB923C", "TRAY_ACTIVE": (251, 146, 60)},
-    "teal":    {"ACCENT": "#2DD4BF", "TRAY_ACTIVE": (45, 212, 191)},
-    "rojo":    {"ACCENT": "#F87171", "TRAY_ACTIVE": (248, 113, 113)},
+    "azul":    {"ACCENT": "#3B82F6", "TRAY_ACTIVE": (59, 130, 246), "GLOW": "#3B82F6"},
+    "verde":   {"ACCENT": "#10B981", "TRAY_ACTIVE": (16, 185, 129), "GLOW": "#10B981"},
+    "morado":  {"ACCENT": "#8B5CF6", "TRAY_ACTIVE": (139, 92, 246), "GLOW": "#8B5CF6"},
+    "rosa":    {"ACCENT": "#EC4899", "TRAY_ACTIVE": (236, 72, 153), "GLOW": "#EC4899"},
+    "naranja": {"ACCENT": "#F97316", "TRAY_ACTIVE": (249, 115, 22), "GLOW": "#F97316"},
+    "teal":    {"ACCENT": "#14B8A6", "TRAY_ACTIVE": (20, 184, 166), "GLOW": "#14B8A6"},
+    "rojo":    {"ACCENT": "#EF4444", "TRAY_ACTIVE": (239, 68, 68), "GLOW": "#EF4444"},
 }
 
 # ── Paletas de fondo ───────────────────────────────────────────────────────
 
 FONDO_PALETTES: dict[str, dict[str, str]] = {
     "estandar":   {},
-    "profundo":   {"BG": "#08080A", "BG2": "#121316", "BG3": "#202126", "CARD": "#121316"},
-    "gris":       {"BG": "#161618", "BG2": "#202124", "BG3": "#2E2F34", "CARD": "#202124"},
-    "azulado":    {"BG": "#0D1117", "BG2": "#161B22", "BG3": "#21262D", "CARD": "#161B22"},
-    "blanco":     {"BG": "#FFFFFF", "BG2": "#F8F8FA", "BG3": "#EEEEF2", "CARD": "#F8F8FA"},
-    "gris_suave": {"BG": "#E8E8EC", "BG2": "#DDDDE1", "BG3": "#D0D0D5", "CARD": "#FFFFFF"},
-    "calido":     {"BG": "#FAF5F0", "BG2": "#F0EBE6", "BG3": "#E5E0DB", "CARD": "#FFFFFF"},
+    "profundo":   {"BG": "#030712", "BG2": "#0A0E1A", "BG3": "#1F2937", "CARD": "#111827",
+                   "TEXT": "#F9FAFB", "TEXT_DIM": "#9CA3AF", "TEXT_MUTED": "#6B7280",
+                   "SURFACE": "#0A0E1A"},
+    "gris":       {"BG": "#111318", "BG2": "#1C1F26", "BG3": "#2D3139", "CARD": "#1C1F26",
+                   "TEXT": "#F9FAFB", "TEXT_DIM": "#9CA3AF", "TEXT_MUTED": "#6B7280",
+                   "SURFACE": "#111318"},
+    "azulado":    {"BG": "#0B1120", "BG2": "#111827", "BG3": "#1E293B", "CARD": "#111827",
+                   "TEXT": "#F9FAFB", "TEXT_DIM": "#9CA3AF", "TEXT_MUTED": "#6B7280",
+                   "SURFACE": "#0B1120"},
+    "blanco":     {"BG": "#FFFFFF", "BG2": "#F8FAFC", "BG3": "#F1F5F9", "CARD": "#FFFFFF",
+                   "TEXT": "#0F172A", "TEXT_DIM": "#64748B", "TEXT_MUTED": "#94A3B8",
+                   "SURFACE": "#FFFFFF"},
+    "gris_suave": {"BG": "#F1F5F9", "BG2": "#FFFFFF", "BG3": "#E2E8F0", "CARD": "#FFFFFF",
+                   "TEXT": "#0F172A", "TEXT_DIM": "#64748B", "TEXT_MUTED": "#94A3B8",
+                   "SURFACE": "#F1F5F9"},
+    "calido":     {"BG": "#FFFBEB", "BG2": "#FFFFFF", "BG3": "#FEF3C7", "CARD": "#FFFFFF",
+                   "TEXT": "#0F172A", "TEXT_DIM": "#64748B", "TEXT_MUTED": "#94A3B8",
+                   "SURFACE": "#FFFBEB"},
 }
 
 _tema_actual: str = "oscuro"
@@ -186,7 +202,7 @@ def set_theme(nombre: str, acento: str = "azul", fondo: str = "estandar") -> Non
             try:
                 import darkdetect
                 ctk.set_appearance_mode("dark" if darkdetect.theme() == "Dark" else "light")
-            except ImportError:
+            except (ImportError, Exception):
                 ctk.set_appearance_mode("dark")
     except ImportError:
         pass
@@ -205,26 +221,38 @@ LOG_DIR: str = os.path.join(
 )
 os.makedirs(LOG_DIR, exist_ok=True)
 
-_file_handler = logging.FileHandler(
-    os.path.join(LOG_DIR, "flowbreak.log"),
-    encoding="utf-8",
-)
-_file_handler.setLevel(logging.DEBUG)
-_file_handler.setFormatter(logging.Formatter(
-    "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-))
+_log_initialized: bool = False
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-    handlers=[
-        logging.StreamHandler(),
-        _file_handler,
-    ],
-)
+
+def _ensure_logging() -> None:
+    global _log_initialized
+    if _log_initialized:
+        return
+    _log_initialized = True
+
+    _file_handler = logging.FileHandler(
+        os.path.join(LOG_DIR, "flowbreak.log"),
+        encoding="utf-8",
+    )
+    _file_handler.setLevel(logging.DEBUG)
+    _file_handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S",
+        handlers=[
+            logging.StreamHandler(),
+            _file_handler,
+        ],
+    )
+
+
 log = logging.getLogger("FlowBreak")
+_ensure_logging()
 
 # ── Config por defecto ─────────────────────────────────────────────────────
 
@@ -278,20 +306,52 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "tamano_letra": "normal",
     "color_acento": "azul",
     "fondo": "estandar",
+    "hotkeys_enabled": True,
+    "pantalla_completa": False,
+    "guia_voz": True,
+    "tts_activo": False,
+    "sonidos_personalizados": False,
+    # ── Nuevas features ──
+    "postura_recordatorio": False,
+    "postura_intervalo_min": 20,
+    "pomodoro_trabajo_min": 25,
+    "pomodoro_descanso_corto_min": 5,
+    "pomodoro_descanso_largo_min": 15,
+    "pomodoro_rondas_largas": 4,
+    "compacto_enabled": False,
+    "floating_enabled": False,
+    "floating_opacity": 85,
+    "workouts": [],
+    "workout_ultimo": None,
+    "logros_mostrados": [],
+    "hotkey_siguiente": "ctrl+right",
+    "hotkey_anterior": "ctrl+left",
+    "hotkey_pausar": "ctrl+space",
+    "hotkey_saltar": "ctrl+escape",
+    "color_personalizado_primary": "",
+    "color_personalizado_accent": "",
+    "sound_packs": ["default"],
+    "sound_pack_activo": "default",
+    "tutorial_paso": 0,
+    "tutorial_completado": False,
+    "fullscreen_tema": "oscuro",
 }
 
 # ── Ejercicios ─────────────────────────────────────────────────────────────
 
 EJERCICIOS_BUILTIN: list[dict[str, Any]] = [
-    {"id": "cuello",  "nombre": "Estiramiento de cuello",  "icono": "🧘", "pasos": ["Inclina la cabeza a la derecha (10 seg)", "Inclina la cabeza a la izquierda (10 seg)", "Gira suavemente en circulos (3 veces)"]},
-    {"id": "hombros", "nombre": "Estiramiento de hombros", "icono": "💪", "pasos": ["Lleva el brazo derecho al pecho y sujetalo (10 seg)", "Repite con el brazo izquierdo", "Sube los hombros hasta las orejas y suelta (5 veces)"]},
-    {"id": "espalda", "nombre": "Estiramiento de espalda", "icono": "🏃", "pasos": ["Parate y estira los brazos hacia arriba (10 seg)", "Inclinate hacia adelante y toca tus pies (10 seg)", "Gira el tronco a cada lado (5 veces)"]},
-    {"id": "visual",  "nombre": "Descanso visual",         "icono": "👁️", "pasos": ["Mira un objeto lejano 6+ metros por 20 seg", "Cierra los ojos y apoyalos con las palmas (10 seg)", "Parpadea rapidamente 10 veces"]},
-    {"id": "manos",   "nombre": "Ejercicio de manos",      "icono": "✋", "pasos": ["Abre y cierra los punos (10 veces)", "Gira las munecas en circulos (5 por lado)", "Estira los dedos hacia atras suavemente (10 seg)"]},
-    {"id": "sentad",  "nombre": "Sentadillas rapidas",     "icono": "🏋️", "pasos": ["Parate con pies al ancho de los hombros", "Baja lentamente hasta 90 grados (5 veces)", "Manten la espalda recta en todo momento"]},
-    {"id": "respira", "nombre": "Respiracion profunda",    "icono": "🌬️", "pasos": ["Inhala profundo por 4 segundos", "Reten el aire 4 segundos", "Exhala lentamente por 6 segundos (repite 5 veces)"]},
-    {"id": "caminar", "nombre": "Caminar",                 "icono": "🚶", "pasos": ["Levantate y camina al menos 50 pasos", "Sube y baja escaleras si es posible", "Regresa y estira las piernas brevemente"]},
-    {"id": "postura", "nombre": "Postura de poder",        "icono": "🧍", "pasos": ["Parate derecho, pies al ancho de los hombros", "Hombros hacia atras y abajo, pecho al frente", "Menton paralelo al piso, manten 30 segundos respirando profundo"]},
+    {"id": "cuello",  "nombre": "Estiramiento de cuello",  "icono": "🧘", "instrucciones": "Libera la tensión del cuello y hombros acumulada por la pantalla.", "pasos": ["Inclina la cabeza a la derecha llevando la oreja al hombro 15 seg", "Inclina la cabeza a la izquierda llevando la oreja al hombro 15 seg", "Gira el cuello suavemente a la derecha y a la izquierda 5 veces cada lado"]},
+    {"id": "hombros", "nombre": "Estiramiento de hombros", "icono": "💪", "instrucciones": "Afloja los hombros rígidos por la mala postura frente al ordenador.", "pasos": ["Sube los hombros hasta las orejas aguantando 3 seg y suelta 10 veces", "Rota los hombros hacia atrás en círculos amplios 10 veces", "Rota los hombros hacia adelante en círculos amplios 10 veces"]},
+    {"id": "espalda", "nombre": "Estiramiento de espalda", "icono": "🏃", "instrucciones": "Estira la espalda para contrarrestar horas de estar sentado.", "pasos": ["Entrelaza las manos y estíralas hacia arriba con palmas al techo 15 seg", "Inclínate hacia adelante desde la cadera tocando los pies 15 seg", "Gira el tronco a la derecha y a la izquierda con manos en la cadera 5 veces"]},
+    {"id": "visual",  "nombre": "Descanso visual",         "icono": "👁️", "instrucciones": "Descansa tus ojos del brillo de la pantalla. Sigue la regla 20-20-20.", "pasos": ["Mira un objeto lejano a 6+ metros por 20 segundos", "Cierra los ojos y cúbrelos con las palmas sin presionar 15 seg", "Parpadea rápidamente 10 veces y haz círculos con los ojos 5 por lado"]},
+    {"id": "manos",   "nombre": "Ejercicio de manos y muñecas", "icono": "✋", "instrucciones": "Previene lesiones por escritura y uso del ratón.", "pasos": ["Extiende el brazo con palma arriba y empuja los dedos hacia abajo 12 seg cada mano", "Abre y cierra los puños extendiendo bien los dedos 10 veces", "Gira las muñecas en círculos 5 veces por lado"]},
+    {"id": "sentad",  "nombre": "Sentadillas y piernas",     "icono": "🏋️", "instrucciones": "Activa piernas y glúteos para mejorar la circulación.", "pasos": ["Levántate de la silla y baja en sentadilla hasta 90° con espalda recta 8 veces", "Eleva talones quedándote de puntillas 15 veces", "Eleva rodillas alternando como marchando en el sitio 20 veces"]},
+    {"id": "respira", "nombre": "Respiración profunda",      "icono": "🌬️", "instrucciones": "Oxigena tu cuerpo y relaja la mente con respiración consciente.", "pasos": ["Inhala profundamente por la nariz contando 4 seg", "Retén el aire contando 4 seg", "Exhala lentamente por la boca contando 6 seg. Repite 5 veces"]},
+    {"id": "caminar", "nombre": "Caminata activa en el sitio", "icono": "🚶", "instrucciones": "Activa la circulación caminando sin moverte del sitio.", "pasos": ["Marcha levantando las rodillas a la altura de la cadera 30 seg", "Balancea los brazos coordinados al caminar 30 seg", "Haz talones a los glúteos alternando piernas 30 seg"]},
+    {"id": "postura", "nombre": "Corrección de postura",     "icono": "🧍", "instrucciones": "Corrige la postura encorvada y fortalece la espalda alta.", "pasos": ["Párate derecho llevando hombros atrás y abajo, pecho abierto 15 seg", "Lleva los brazos en forma de W apretando omóplatos 12 veces", "Mantén la postura correcta respirando profundo 20 seg"]},
+    {"id": "cadera",  "nombre": "Movilidad de cadera",       "icono": "🔄", "instrucciones": "Afloja las caderas y la zona lumbar tras estar sentado.", "pasos": ["De pie, apoya manos en caderas y haz círculos amplios a la derecha 20 seg", "Repite círculos hacia la izquierda 20 seg", "Empuja la cadera adelante y atrás balanceando 10 veces"]},
+    {"id": "tobillos","nombre": "Movilidad de tobillos",     "icono": "🦶", "instrucciones": "Mejora la circulación de piernas y previene pies hinchados.", "pasos": ["Eleva un pie y rota el tobillo en círculos derecha 15 seg", "Rota el mismo tobillo a la izquierda 15 seg", "Cambia de pie y repite rotaciones 30 seg total"]},
+    {"id": "yoga",    "nombre": "Estiramiento de yoga silla", "icono": "🧎", "instrucciones": "Estira la espalda y relaja la mente con esta postura.", "pasos": ["Siéntate erguido al borde de la silla, estira brazos arriba 15 seg", "Inclínate hacia adelante dejando caer brazos y cabeza 15 seg", "Gira el tronco hacia la derecha y agarra el respaldo 10 seg cada lado"]},
 ]
 
 EJERCICIOS: list[dict[str, Any]] = list(EJERCICIOS_BUILTIN)
@@ -307,6 +367,32 @@ def load_ejercicios_from_file(filepath: str) -> list[dict[str, Any]]:
         except (json.JSONDecodeError, OSError) as e:
             log.warning("Error loading ejercicios from %s: %s", filepath, e)
     return list(EJERCICIOS_BUILTIN)
+
+
+# ── Notas de bienestar ──────────────────────────────────────────────────────
+
+WELLNESS_NOTES: list[dict[str, str]] = [
+    {"icon": "🧘", "title": "Respira profundo", "msg": "Inhala 4 seg, sostén 4 seg, exhala 6 seg. Repite 3 veces."},
+    {"icon": "💧", "title": "Hidrátate", "msg": "Tómate un vaso de agua. Tu cuerpo te lo agradecerá."},
+    {"icon": "👀", "title": "Descansa la vista", "msg": "Mira algo lejano a 6 metros por 20 segundos."},
+    {"icon": "🧍", "title": "Corrige tu postura", "msg": "Espalda recta, hombros relajados, pies en el suelo."},
+    {"icon": "🌞", "title": "Busca luz natural", Si buscas una ventana. La luz natural mejora tu ánimo."},
+    {"icon": "🧠", "title": "Limpia tu mente", "msg": "Cierra los ojos 30 segundos y piensa en algo que te haga feliz."},
+    {"icon": "💪", "title": "Estira tu cuerpo", "msg": "Estira los brazos arriba y mantén 10 segundos."},
+    {"icon": "😊", "title": "Sonríe", "msg": "Una sonrisa libera endorfinas. ¡Hazlo ahora!"},
+    {"icon": "🪑", "title": "Levántate", "msg": "Si llevas más de 30 min sentado, párate y camina un momento."},
+    {"icon": "🎶", "title": "Escucha música", "msg": "Pon una canción que te guste y disfruta el momento."},
+    {"icon": "🌿", "title": "Conecta con la naturaleza", "msg": "Mira por la ventana o sal un momento al exterior."},
+    {"icon": "🫁", "title": "Oxigena tu cerebro", "msg": "5 respiraciones profundas aumentan tu concentración."},
+    {"icon": " massag", "title": "Relaja el cuello", "msg": "Inclina la cabeza suavemente a cada lado, 10 seg por lado."},
+    {"icon": "☕", "title": "Pausa consciente", "msg": "Si tomas café, disfrútalo sin mirar la pantalla."},
+    {"icon": "🙏", "title": "Agradece", "msg": "Piensa en 3 cosas buenas que te pasaron hoy."},
+    {"icon": "💪", "title": "Activa piernas", "msg": "Haz 10 sentadillas suaves para activar la circulación."},
+    {"icon": "🎵", "title": "Canta", "msg": "Canta tu canción favorita. Libera tensión y mejora el ánimo."},
+    {"icon": "🤗", "title": "Abrázate", "msg": "Un abrazo a ti mismo reduce el estrés. Hazlo ahora."},
+    {"icon": "🌺", "title": "Aromaterapia", "msg": "Si tienes aceite esencial, aplícalo en las muñecas."},
+    {"icon": "😴", "title": "Poder del sueño", "msg": "Dormir 7-8 horas mejora tu productividad un 30%."},
+]
 
 
 # ── i18n ───────────────────────────────────────────────────────────────────
@@ -327,6 +413,7 @@ I18N: dict[str, dict[str, Any]] = {
         "minimizar": "Minimizar a bandeja",
         "saltar_pausa": "Saltar pausa",
         "tiempo_restante": "tiempo restante",
+        "preparate": "Prepárate",
         "trabajando": "Trabajando...",
         "pausado": "Timer pausado",
         "pausa_saltada": "Pausa saltada.",
@@ -341,6 +428,14 @@ I18N: dict[str, dict[str, Any]] = {
         "pausar_tray": "Pausar/Reanudar",
         "buscar_actualizaciones": "Buscar actualizaciones",
         "salir": "Salir",
+        # Hotkeys
+        "hotkey_break_now": "Pausa ya (Ctrl+Alt+B)",
+        "hotkey_snooze": "Posponer (Ctrl+Alt+S)",
+        "hotkey_pause_resume": "Pausar/Reanudar (Ctrl+Alt+P)",
+        "hotkey_show_hide": "Mostrar/Ocultar (Ctrl+Alt+H)",
+        "hotkey_quit": "Salir (Ctrl+Alt+Q)",
+        "section_hotkeys": "Atajos globales",
+        "hotkeys_enabled": "Activar atajos globales",
         # Badges
         "badge_activo": "ACTIVO",
         "badge_pausado": "PAUSADO",
@@ -588,6 +683,17 @@ I18N: dict[str, dict[str, Any]] = {
         "font_normal": "Normal",
         "font_grande": "Grande",
         "font_muy_grande": "Muy grande",
+        # BreakWindow immersive / summary
+        "break_fullscreen": "Pantalla completa",
+        "break_voice": "Guía por voz",
+        "break_summary_title": "Pausa completada",
+        "break_summary_ejercicio": "Ejercicio: {nombre}",
+        "break_summary_tiempo": "Duración: {min} min",
+        "break_summary_pasos": "Pasos realizados: {completos}/{total}",
+        "break_summary_congrats": "¡Sigue así!",
+        "comenzar": "Comenzar",
+        "break_congrats_title": "¡Muy bien!",
+        "break_congrats_desc": "Completaste tu pausa activa. Tu cuerpo te lo agradece.",
         # Frases motivacionales
         "frases": [
             "¡Excelente! Tu cuerpo te lo agradece.",
@@ -601,6 +707,83 @@ I18N: dict[str, dict[str, Any]] = {
             "¡Meta del día cumplida! Gran trabajo.",
             "Descansar es parte del éxito.",
         ],
+        # ── Nuevas features ──
+        # Postura
+        "postura_recordatorio": "Recordatorio de postura",
+        "postura_intervalo": "Cada cuántos minutos (postura):",
+        # Pomodoro
+        "pomodoro_trabajo": "Trabajo (min)",
+        "pomodoro_descanso_corto": "Descanso corto (min)",
+        "pomodoro_descanso_largo": "Descanso largo (min)",
+        "pomodoro_rondas": "Rondas antes de descanso largo",
+        "pomodoro_sesion_trabajo": "Sesión de trabajo",
+        "pomodoro_sesion_descanso": "Descanso",
+        "pomodoro_sesion_largo": "Descanso largo",
+        # Compacto
+        "modo_compacto": "Modo compacto",
+        "compacto_desc": "Mini ventana con timer y controles básicos",
+        # Floating
+        "floating_timer": "Timer flotante",
+        "floating_desc": "Mini timer siempre visible en escritorio",
+        "floating_opacidad": "Opacidad del timer flotante",
+        # Workout
+        "workout": "Rutina de ejercicio",
+        "workouts": "Mis rutinas",
+        "workout_crear": "Crear rutina",
+        "workout_nombre": "Nombre de la rutina",
+        "workout_agregar_ej": "Agregar ejercicio",
+        "workout_orden": "Orden",
+        "workout_guardar": "Guardar rutina",
+        "workout_ejecutar": "Iniciar rutina",
+        "workout_vacia": "No hay rutinas creadas",
+        # Logros
+        "logros": "Logros",
+        "logro_primera_pausa": "Primera pausa completada",
+        "logro_5_pausas": "5 pausas en un día",
+        "logro_10_pausas": "10 pausas en un día",
+        "logro_racha_3": "Racha de 3 días",
+        "logro_racha_7": "Racha de 1 semana",
+        "logro_racha_30": "Racha de 1 mes",
+        "logro_todos_ejercicios": "Todos los ejercicios completados",
+        "logro_early_bird": "Pausa antes de las 9am",
+        "logro_night_owl": "Pausa después de las 8pm",
+        "logro_water_10": "10 recordatorios de agua",
+        "logro_desbloqueado": "¡Logro desbloqueado!",
+        # Exportar/Importar
+        "exportar_stats": "Exportar estadísticas",
+        "importar_stats": "Importar estadísticas",
+        "exportar_ok": "Estadísticas exportadas a:\n{path}",
+        "importar_ok": "Estadísticas importadas correctamente",
+        "importar_error": "Error al importar: {error}",
+        # Hotkeys personalizables
+        "section_hotkeys_custom": "Atajos de teclado",
+        "hotkey_siguiente": "Siguiente paso/ejercicio",
+        "hotkey_anterior": "Paso/ejercicio anterior",
+        "hotkey_pausar": "Pausar/reanudar timer",
+        "hotkey_saltar": "Saltar pausa",
+        # Sonido
+        "sound_packs": "Paquetes de sonido",
+        "sound_pack_default": "Por defecto",
+        "sound_pack_nature": "Naturaleza",
+        "sound_pack_minimal": "Minimalista",
+        "sound_pack_activo": "Paquete activo",
+        # Tutorial
+        "tutorial_paso1_titulo": "Paso 1: Configura tus pausas",
+        "tutorial_paso1_desc": "Establece cada cuánto tiempo quieres hacer una pausa activa.",
+        "tutorial_paso2_titulo": "Paso 2: Elige ejercicios",
+        "tutorial_paso2_desc": "Selecciona los ejercicios que más te gusten.",
+        "tutorial_paso3_titulo": "Paso 3: Personaliza",
+        "tutorial_paso3_desc": "Cambia colores, sonidos y otros ajustes.",
+        "tutorial_saltar": "Saltar tutorial",
+        "tutorial_completar": "¡Entendido!",
+        # Fullscreen
+        "fullscreen_timer": "Modo pantalla completa",
+        "fullscreen_desc": "Timer grande a pantalla completa para presentaciones",
+        "fullscreen_salir": "Salir de pantalla completa (Esc)",
+        # Toast
+        "toast_info": "Información",
+        "toast_exito": "Éxito",
+        "toast_advertencia": "Advertencia",
     },
     "en": {
         # Identity
@@ -617,6 +800,7 @@ I18N: dict[str, dict[str, Any]] = {
         "minimizar": "Minimize to tray",
         "saltar_pausa": "Skip break",
         "tiempo_restante": "time remaining",
+        "preparate": "Get ready",
         "trabajando": "Working...",
         "pausado": "Timer paused",
         "pausa_saltada": "Break skipped.",
@@ -631,6 +815,14 @@ I18N: dict[str, dict[str, Any]] = {
         "pausar_tray": "Pause/Resume",
         "buscar_actualizaciones": "Check for updates",
         "salir": "Exit",
+        # Hotkeys
+        "hotkey_break_now": "Break now (Ctrl+Alt+B)",
+        "hotkey_snooze": "Snooze (Ctrl+Alt+S)",
+        "hotkey_pause_resume": "Pause/Resume (Ctrl+Alt+P)",
+        "hotkey_show_hide": "Show/Hide (Ctrl+Alt+H)",
+        "hotkey_quit": "Exit (Ctrl+Alt+Q)",
+        "section_hotkeys": "Global Hotkeys",
+        "hotkeys_enabled": "Enable global hotkeys",
         # Badges
         "badge_activo": "ACTIVE",
         "badge_pausado": "PAUSED",
@@ -880,6 +1072,94 @@ I18N: dict[str, dict[str, Any]] = {
         "font_normal": "Normal",
         "font_grande": "Large",
         "font_muy_grande": "Extra large",
+        # BreakWindow immersive / summary
+        "break_fullscreen": "Fullscreen break",
+        "break_voice": "Voice guide",
+        "break_summary_title": "Break completed",
+        "break_summary_ejercicio": "Exercise: {nombre}",
+        "break_summary_tiempo": "Duration: {min} min",
+        "break_summary_pasos": "Steps done: {completos}/{total}",
+        "break_summary_congrats": "Keep it up!",
+        "comenzar": "Start",
+        "break_congrats_title": "Great job!",
+        "break_congrats_desc": "You completed your active break. Your body thanks you.",
+        # ── New features ──
+        # Posture
+        "postura_recordatorio": "Posture reminder",
+        "postura_intervalo": "Posture reminder interval (min):",
+        # Pomodoro
+        "pomodoro_trabajo": "Work (min)",
+        "pomodoro_descanso_corto": "Short break (min)",
+        "pomodoro_descanso_largo": "Long break (min)",
+        "pomodoro_rondas": "Rounds before long break",
+        "pomodoro_sesion_trabajo": "Work session",
+        "pomodoro_sesion_descanso": "Break",
+        "pomodoro_sesion_largo": "Long break",
+        # Compact
+        "modo_compacto": "Compact mode",
+        "compacto_desc": "Mini window with timer and basic controls",
+        # Floating
+        "floating_timer": "Floating timer",
+        "floating_desc": "Mini timer always visible on desktop",
+        "floating_opacidad": "Floating timer opacity",
+        # Workout
+        "workout": "Workout",
+        "workouts": "My workouts",
+        "workout_crear": "Create workout",
+        "workout_nombre": "Workout name",
+        "workout_agregar_ej": "Add exercise",
+        "workout_orden": "Order",
+        "workout_guardar": "Save workout",
+        "workout_ejecutar": "Start workout",
+        "workout_vacia": "No workouts created",
+        # Achievements
+        "logros": "Achievements",
+        "logro_primera_pausa": "First break completed",
+        "logro_5_pausas": "5 breaks in one day",
+        "logro_10_pausas": "10 breaks in one day",
+        "logro_racha_3": "3-day streak",
+        "logro_racha_7": "1-week streak",
+        "logro_racha_30": "1-month streak",
+        "logro_todos_ejercicios": "All exercises completed",
+        "logro_early_bird": "Break before 9am",
+        "logro_night_owl": "Break after 8pm",
+        "logro_water_10": "10 water reminders",
+        "logro_desbloqueado": "Achievement unlocked!",
+        # Export/Import
+        "exportar_stats": "Export statistics",
+        "importar_stats": "Import statistics",
+        "exportar_ok": "Statistics exported to:\n{path}",
+        "importar_ok": "Statistics imported successfully",
+        "importar_error": "Import error: {error}",
+        # Custom hotkeys
+        "section_hotkeys_custom": "Keyboard shortcuts",
+        "hotkey_siguiente": "Next step/exercise",
+        "hotkey_anterior": "Previous step/exercise",
+        "hotkey_pausar": "Pause/resume timer",
+        "hotkey_saltar": "Skip break",
+        # Sound
+        "sound_packs": "Sound packs",
+        "sound_pack_default": "Default",
+        "sound_pack_nature": "Nature",
+        "sound_pack_minimal": "Minimal",
+        "sound_pack_activo": "Active pack",
+        # Tutorial
+        "tutorial_paso1_titulo": "Step 1: Configure your breaks",
+        "tutorial_paso1_desc": "Set how often you want to take an active break.",
+        "tutorial_paso2_titulo": "Step 2: Choose exercises",
+        "tutorial_paso2_desc": "Select the exercises you like most.",
+        "tutorial_paso3_titulo": "Step 3: Customize",
+        "tutorial_paso3_desc": "Change colors, sounds and other settings.",
+        "tutorial_saltar": "Skip tutorial",
+        "tutorial_completar": "Got it!",
+        # Fullscreen
+        "fullscreen_timer": "Fullscreen mode",
+        "fullscreen_desc": "Large timer fullscreen for presentations",
+        "fullscreen_salir": "Exit fullscreen (Esc)",
+        # Toast
+        "toast_info": "Information",
+        "toast_exito": "Success",
+        "toast_advertencia": "Warning",
         # Motivational phrases
         "frases": [
             "Excellent! Your body thanks you.",

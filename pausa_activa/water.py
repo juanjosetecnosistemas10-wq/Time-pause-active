@@ -44,16 +44,14 @@ class WaterReminder:
             try:
                 cfg: dict[str, Any] = self._cfg_getter()
                 if not cfg.get("agua_activo", True):
-                    for _ in range(60):
-                        if self._stop.wait(1):
-                            return
+                    if self._stop.wait(60):
+                        return
                     continue
                 mins: int = max(1, cfg.get("agua_min", 30))
-                remaining_sec: int = mins * 60
-                while remaining_sec > 0:
+                deadline = time.monotonic() + mins * 60
+                while time.monotonic() < deadline:
                     if self._stop.wait(1):
                         return
-                    remaining_sec -= 1
                 if self._stop.is_set():
                     return
                 send_win_notification(
@@ -70,6 +68,5 @@ class WaterReminder:
                     pass
             except Exception as exc:
                 log.exception("Error en WaterReminder: %s", exc)
-                for _ in range(60):
-                    if self._stop.wait(1):
-                        return
+                if self._stop.wait(60):
+                    return

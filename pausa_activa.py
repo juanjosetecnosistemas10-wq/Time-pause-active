@@ -39,13 +39,14 @@ if __name__ == "__main__":
                 errores.append(str(e))
             # Remove shortcuts
             _eliminar_accesos_directos(errores)
+            # Save install_dir before removing registry
+            install_dir = _get_install_dir_from_registry() or APP_DIR
             # Remove registry
             try:
                 _quitar_registro_desinstalador()
             except Exception:
                 pass
             # Schedule folder deletion
-            install_dir = _get_install_dir_from_registry() or APP_DIR
             _programar_borrado_carpeta(install_dir)
             mb.showinfo(
                 "Desinstalación completa",

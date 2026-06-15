@@ -4,3 +4,5 @@ winotify==1.1.0
 customtkinter==5.2.2
 darkdetect==0.8.0
 pytest==8.3.4
+pynput==1.7.6
+pywin32==308

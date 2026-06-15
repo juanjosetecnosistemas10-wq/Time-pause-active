@@ -6,6 +6,7 @@ import os
 import random
 import sys
 import threading
+import tkinter as tk
 import customtkinter as ctk
 from datetime import datetime
 from tkinter import Canvas
@@ -22,11 +23,17 @@ from pausa_activa.config import ConfigManager
 from pausa_activa.audio import AudioManager
 from pausa_activa.water import WaterReminder
 from pausa_activa.notifications import send_win_notification
-from pausa_activa.installer import InstallerWindow, _is_installed
+from pausa_activa.installer import InstallerWindow, _is_installed, _get_install_dir_from_registry
 from pausa_activa.windows import (
-    PausaWindow, StatsWindow, ConfigWindow, WelcomeWindow, UninstallWindow,
-    draw_bar_chart, audio_manager,
+    BreakWindow, StatsWindow, ConfigWindow, WelcomeWindow, UninstallWindow,
+    draw_bar_chart, get_audio_manager,
+    ToastNotification, toast, FloatingTimer, CompactWindow, FullscreenTimer,
+    AchievementsWindow, check_achievements, ACHIEVEMENTS,
+    CustomExerciseWindow, WorkoutWindow, TutorialWindow, PostureReminder,
+    StatsWindowEnhanced,
+    FlowBuddyWidget, FlowBuddyWindow, AIInsightsWindow, AIEngine,
 )
+from pausa_activa.hotkeys import HotkeyManager, create_default_manager
 
 try:
     import pystray
@@ -120,7 +127,9 @@ class Updater:
                 if name.endswith(".exe") and "FlowBreak" in name:
                     exe_url = asset.get("browser_download_url")
                     break
-            return {"version": latest_tag, "url": exe_url or ""}
+            if not exe_url:
+                return None
+            return {"version": latest_tag, "url": exe_url}
         except Exception as e:
             log.debug("Update check failed: %s", e)
             return None
@@ -144,7 +153,7 @@ class App(ctk.CTk):
         self._cfg_mgr: ConfigManager = cfg_mgr or ConfigManager(
             *self._paths_from_dir(app_dir)
         )
-        self._audio_mgr: AudioManager = audio_mgr or audio_manager
+        # audio_mgr param accepted for API compat; module-level audio_manager used directly
         self._init_paths(app_dir)
 
         self.cfg: dict[str, Any] = self._cfg_mgr.load_config()
@@ -181,6 +190,20 @@ class App(ctk.CTk):
         )
 
         threading.Thread(target=self._check_update, daemon=True).start()
+
+        # If installed but running from wrong folder → relocate
+        if _is_installed():
+            reg_dir = _get_install_dir_from_registry()
+            if reg_dir and os.path.normpath(app_dir) != os.path.normpath(reg_dir):
+                dest = os.path.join(reg_dir, os.path.basename(app_path))
+                if getattr(sys, "frozen", False) and dest != app_path:
+                    import shutil, subprocess
+                    try:
+                        shutil.copy2(app_path, dest)
+                        subprocess.Popen([dest])
+                        sys.exit(0)
+                    except PermissionError:
+                        log.warning("No se pudo copiar a %s (archivo en uso), continuando desde %s", dest, app_path)
 
         if not _is_installed():
             self.withdraw()
@@ -224,7 +247,10 @@ class App(ctk.CTk):
                 self._update_available = True
                 ver: str = info["version"]
                 log.info("Actualizacion disponible: %s (actual: %s)", ver, __version__)
-                self.after(3000, lambda: self._show_update_notification(ver))
+                try:
+                    self.after(3000, lambda: self._show_update_notification(ver))
+                except Exception:
+                    pass
             else:
                 log.debug("No hay actualizaciones disponibles")
         except Exception as e:
@@ -240,9 +266,10 @@ class App(ctk.CTk):
             sound="reminder",
             duration="long",
         )
-        if self.lbl_update:
-            self.lbl_update.configure(text=f"{_('update_badge')} {version}", text_color=C.YELLOW)
-            self.lbl_update.pack(pady=(0, 2))
+        lbl = getattr(self, "lbl_update", None)
+        if lbl:
+            lbl.configure(text=f"{_('update_badge')} {version}", text_color=C.YELLOW)
+            lbl.pack(pady=(0, 2))
 
     def _update_paths(self, app_dir: str) -> None:
         self._app_dir = app_dir
@@ -269,6 +296,22 @@ class App(ctk.CTk):
 
     def _start_main(self) -> None:
         set_font_size(self.cfg.get("tamano_letra", "normal"))
+
+        # Inicializar FlowBuddy ANTES de _build
+        self._pet_state = self.cfg.get("pet_state", {
+            "nombre": "FlowBuddy",
+            "energia": 100,
+            "felicidad": 100,
+            "salud": 100,
+            "nivel": 1,
+            "xp": 0,
+            "xp_siguiente": 100,
+            "ultimo_alimento": 0,
+        })
+
+        # Inicializar AI Engine
+        self._ai_engine = AIEngine(self.stats, self.cfg)
+
         self._build()
         self._fade_in()
         self._center()
@@ -278,8 +321,92 @@ class App(ctk.CTk):
         if self.cfg.get("agua_activo", True):
             self._water.start()
 
+        # Posture reminder
+        self._posture = PostureReminder(self)
+        if self.cfg.get("postura_recordatorio", False):
+            self._posture.start(self.cfg.get("postura_intervalo_min", 20))
+
+        # Floating timer
+        self._floating: FloatingTimer | None = None
+        if self.cfg.get("floating_enabled", False):
+            self._create_floating_timer()
+
+        # Compact mode
+        self._compact: CompactWindow | None = None
+        if self.cfg.get("compacto_enabled", False):
+            self._create_compact_window()
+
+        # Tutorial
+        if self.cfg.get("primera_vez", True) and not self.cfg.get("tutorial_completado", False):
+            self.after(1000, self._open_tutorial)
+
+        # Check achievements on startup
+        self.after(2000, self._check_achievements)
+
+        # Eye reminder (20-20-20)
+        self._schedule_eye_reminder()
+
+        # Weekly snapshot
+        self._save_weekly_snapshot()
+
+        # FlowBuddy decay
+        self._pet_decay_job: str | None = None
+        self._start_pet_decay()
+
         if TRAY_AVAILABLE:
             threading.Thread(target=self._start_tray, daemon=True).start()
+
+        self._hotkeys = create_default_manager(
+            on_break_now=self._hotkey_break_now,
+            on_snooze=self._hotkey_snooze,
+            on_pause_resume=self._hotkey_pause_resume,
+            on_show_hide=self._hotkey_show_hide,
+            on_quit=self._hotkey_quit,
+        )
+        self._hotkeys.start()
+
+    def _create_floating_timer(self) -> None:
+        try:
+            if self._floating and self._floating.winfo_exists():
+                self._floating.destroy()
+            self._floating = FloatingTimer(
+                self, lambda: self.remaining,
+                lambda: not self.running,
+                self._show,
+            )
+        except Exception as e:
+            log.warning("Could not create floating timer: %s", e)
+
+    def _create_compact_window(self) -> None:
+        try:
+            if self._compact and self._compact.winfo_exists():
+                self._compact.destroy()
+            self._compact = CompactWindow(
+                self, lambda: self.remaining,
+                lambda: not self.running,
+                self._toggle,
+                self._next_step,
+                self._skip,
+            )
+        except Exception as e:
+            log.warning("Could not create compact window: %s", e)
+
+    def _open_tutorial(self) -> None:
+        TutorialWindow(self, lambda: self.cfg.update({"tutorial_completado": True})).center()
+
+    def _check_achievements(self) -> None:
+        shown = self.cfg.get("logros_mostrados", [])
+        new_achs = check_achievements(self.stats, self._cfg_mgr.load_stats(), shown)
+        if new_achs:
+            self.cfg["logros_mostrados"] = shown
+            for ach in new_achs:
+                toast(_("logro_desbloqueado"), f"{ach['icon']} {_(ach['key'])}", kind="exito", duration=4000)
+
+    def _next_step(self) -> None:
+        pass
+
+    def _skip(self) -> None:
+        pass
 
     # ── Tray ──────────────────────────────────────────────────────────────────
 
@@ -334,95 +461,151 @@ class App(ctk.CTk):
     def _quit(self, i=None, it=None) -> None:
         self.running = False
         self._water.stop()
-        audio_manager.stop_ambient()
+        self._posture.stop()
+        get_audio_manager().cleanup()
+        # Save pet state
+        self.cfg["pet_state"] = self._pet_state
+        self._cfg_mgr.save_config(self.cfg)
+        if self._floating and self._floating.winfo_exists():
+            self._floating.destroy()
+        if self._compact and self._compact.winfo_exists():
+            self._compact.destroy()
         if self._tray:
             self._tray.stop()
+        if hasattr(self, "_hotkeys"):
+            self._hotkeys.stop()
+        if self._pet_decay_job:
+            try:
+                self.after_cancel(self._pet_decay_job)
+            except Exception:
+                pass
         self.after(0, self.destroy)
 
     # ── UI ────────────────────────────────────────────────────────────────────
 
     def _build(self) -> None:
-        self.minsize(380, 520)
-        # Minimal title bar
-        title_frame = ctk.CTkFrame(self, fg_color="transparent")
-        title_frame.pack(fill="x", padx=24, pady=(16, 0))
+        self.minsize(400, 720)
+        self.configure(fg_color=C.BG)
 
-        dot = ctk.CTkLabel(title_frame, text="●", font=F(9), text_color=C.GREEN)
-        dot.pack(side="left", padx=(0, 6))
+        # ── Header ──────────────────────────────────────────────────────
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=28, pady=(20, 0))
 
+        left_h = ctk.CTkFrame(header, fg_color="transparent")
+        left_h.pack(side="left")
+
+        dot = ctk.CTkLabel(left_h, text="●", font=F(10), text_color=C.GREEN)
+        dot.pack(side="left", padx=(0, 8))
+
+        name_frame = ctk.CTkFrame(left_h, fg_color="transparent")
+        name_frame.pack(side="left")
         ctk.CTkLabel(
-            title_frame, text=APP_DISPLAY,
-            font=F(13, "bold"), text_color=C.TEXT,
-        ).pack(side="left")
-
+            name_frame, text=APP_DISPLAY,
+            font=F(16, "bold"), text_color=C.TEXT,
+        ).pack(anchor="w")
         ctk.CTkLabel(
-            title_frame, text="· " + _("pausa_activa"),
-            font=F(9), text_color=C.TEXT_DIM,
-        ).pack(side="left", padx=(4, 0))
+            name_frame, text=_("pausa_activa"),
+            font=F(9), text_color=C.TEXT_MUTED,
+        ).pack(anchor="w")
 
-        btn_frame = ctk.CTkFrame(title_frame, fg_color="transparent")
-        btn_frame.pack(side="right")
+        right_h = ctk.CTkFrame(header, fg_color="transparent")
+        right_h.pack(side="right")
 
         ctk.CTkButton(
-            btn_frame, text="⚙", width=28, height=28,
-            fg_color="transparent", text_color=C.TEXT_DIM, hover_color=C.BG3,
-            font=F(12), corner_radius=14,
+            right_h, text="⚙", width=32, height=32,
+            fg_color=C.BG3, text_color=C.TEXT_DIM, hover_color=C.BG4,
+            font=F(14), corner_radius=10,
             command=self._open_config,
-        ).pack(side="left", padx=(0, 2))
+        ).pack(side="left", padx=(0, 6))
 
         ctk.CTkButton(
-            btn_frame, text="📊", width=28, height=28,
-            fg_color="transparent", text_color=C.TEXT_DIM, hover_color=C.BG3,
-            font=F(12), corner_radius=14,
+            right_h, text="📊", width=32, height=32,
+            fg_color=C.BG3, text_color=C.TEXT_DIM, hover_color=C.BG4,
+            font=F(14), corner_radius=10,
             command=self._open_stats,
         ).pack(side="left")
 
-        # Status text — single line
+        # ── Wellness Card ──────────────────────────────────────────────
+        wellness_card = ctk.CTkFrame(self, fg_color=C.CARD, corner_radius=16,
+                                      border_width=1, border_color=C.CARD_BORDER)
+        wellness_card.pack(fill="x", padx=24, pady=(12, 0))
+
+        wellness_title = ctk.CTkLabel(
+            wellness_card, text="💭 Notas de bienestar",
+            font=F(11, "bold"), text_color=C.TEXT, anchor="w",
+        )
+        wellness_title.pack(pady=(12, 4), padx=16)
+
+        self._wellness_label = ctk.CTkLabel(
+            wellness_card, text="", font=F(9), text_color=C.TEXT_DIM, anchor="w",
+            wraplength=280, justify="left",
+        )
+        self._wellness_label.pack(pady=(0, 12), padx=16)
+
+        self._update_wellness_note()
+
+        # ── Status Badge ───────────────────────────────────────────────
+        self.badge_frame = ctk.CTkFrame(self, fg_color=C.GREEN, corner_radius=20)
+        self.badge_frame.pack(pady=(16, 0))
+        self.lbl_badge = ctk.CTkLabel(
+            self.badge_frame, text=_("badge_activo"), font=F(9, "bold"),
+            text_color="#FFFFFF",
+        )
+        self.lbl_badge.pack(padx=20, pady=4)
+
+        # ── Status text ────────────────────────────────────────────────
         self.lbl_st = ctk.CTkLabel(
-            self, text=_("trabajando"), font=F(10),
+            self, text=_("trabajando"), font=F(11),
             text_color=C.TEXT_DIM, fg_color="transparent",
         )
-        self.lbl_st.pack(pady=(10, 0))
+        self.lbl_st.pack(pady=(8, 0))
 
-        self.badge_frame = ctk.CTkFrame(self, fg_color=C.GREEN, corner_radius=14)
-        self.badge_frame.pack(pady=(4, 0))
-        self.lbl_badge = ctk.CTkLabel(
-            self.badge_frame, text=_("badge_activo"), font=F(8, "bold"),
-            text_color=C.BG,
-        )
-        self.lbl_badge.pack(padx=18, pady=3)
+        # ── Circular Timer (grande, moderno) ───────────────────────────
+        timer_container = ctk.CTkFrame(self, fg_color="transparent")
+        timer_container.pack(pady=(8, 0))
 
-        # Circular timer
         self._canvas = Canvas(
-            self, width=180, height=180,
+            timer_container, width=220, height=220,
             bg=C.BG, highlightthickness=0,
         )
-        self._canvas.pack(pady=(12, 0))
+        self._canvas.pack()
 
-        self._canvas.create_arc(
-            14, 14, 166, 166, start=90, extent=360,
-            outline=C.BG3, width=9, style="arc", tags="bg_arc",
+        cx, cy, r = 110, 110, 95
+        self._canvas.create_oval(
+            cx - r, cy - r, cx + r, cy + r,
+            outline=C.BG3, width=8, tags="bg_oval",
         )
         self._canvas.create_arc(
-            14, 14, 166, 166, start=90, extent=360,
-            outline=C.ACCENT, width=9, style="arc", tags="fg_arc",
+            cx - r, cy - r, cx + r, cy + r,
+            start=90, extent=360,
+            outline=C.ACCENT, width=8, style="arc", tags="fg_arc",
         )
         self._canvas.create_text(
-            90, 88, text="00:00",
-            font=F(30, "bold"),
-            fill=C.ACCENT, tags="cd_text",
+            cx, cy - 8, text="00:00",
+            font=F(38, "bold"), fill=C.TEXT, tags="cd_text",
+        )
+        self._canvas.create_text(
+            cx, cy + 28, text=_("tiempo_restante"),
+            font=F(9), fill=C.TEXT_MUTED, tags="cd_sub",
         )
 
-        # Progress bar
+        # Partículas y efectos
+        self._particles: list[dict] = []
+        self._sparkles: list[dict] = []
+        self._confetti: list[dict] = []
+        self._anim_frame = 0
+        self._start_particle_animation()
+
+        # ── Progress Bar ───────────────────────────────────────────────
         self._progress = ctk.CTkProgressBar(
-            self, width=240, height=4,
-            corner_radius=2, fg_color=C.BG3,
+            self, width=260, height=6,
+            corner_radius=3, fg_color=C.BG3,
             progress_color=C.ACCENT,
         )
-        self._progress.pack(pady=(8, 0))
+        self._progress.pack(pady=(10, 0))
         self._progress.set(1.0)
 
-        # Update notification
+        # ── Update notification ────────────────────────────────────────
         self.lbl_update = ctk.CTkLabel(
             self, text="", font=F(9, "bold"),
             text_color=C.YELLOW, fg_color="transparent",
@@ -430,88 +613,126 @@ class App(ctk.CTk):
         )
         self.lbl_update.bind("<Button-1>", lambda e: self._show_update_dialog())
 
-        # Stats
+        # ── Stats Card ─────────────────────────────────────────────────
+        stats_card = ctk.CTkFrame(self, fg_color=C.CARD, corner_radius=16,
+                                   border_width=1, border_color=C.CARD_BORDER)
+        stats_card.pack(fill="x", padx=24, pady=(12, 0))
+
         self.lbl_stats = ctk.CTkLabel(
-            self, text="", font=F(10),
-            text_color=C.TEXT_DIM, fg_color="transparent",
+            stats_card, text="", font=F(11),
+            text_color=C.TEXT, fg_color="transparent",
         )
-        self.lbl_stats.pack(pady=(10, 0))
+        self.lbl_stats.pack(pady=(10, 2))
 
         self.lbl_meta = ctk.CTkLabel(
-            self, text="", font=F(9, "bold"),
+            stats_card, text="", font=F(10, "bold"),
             text_color=C.TEXT_DIM, fg_color="transparent",
         )
-        self.lbl_meta.pack()
+        self.lbl_meta.pack(pady=(0, 10))
 
-        # Weekly mini chart
-        chart_card = ctk.CTkFrame(self, fg_color=C.BG2, corner_radius=12)
-        chart_card.pack(fill="x", padx=24, pady=(6, 0))
+        # ── Weekly Chart Card ──────────────────────────────────────────
+        chart_card = ctk.CTkFrame(self, fg_color=C.CARD, corner_radius=16,
+                                   border_width=1, border_color=C.CARD_BORDER)
+        chart_card.pack(fill="x", padx=24, pady=(8, 0))
+
+        ctk.CTkLabel(
+            chart_card, text=_("ultimos_7_dias"), font=F(9, "bold"),
+            text_color=C.TEXT_DIM, fg_color="transparent",
+        ).pack(anchor="w", padx=14, pady=(10, 2))
+
         self._week_canvas = Canvas(
-            chart_card, width=280, height=80,
-            bg=C.BG2, highlightthickness=0,
+            chart_card, width=300, height=70,
+            bg=C.CARD, highlightthickness=0,
         )
-        self._week_canvas.pack(padx=8, pady=(4, 8))
+        self._week_canvas.pack(padx=10, pady=(0, 10))
 
-        # Infobar: agua + cfg
-        bar = ctk.CTkFrame(self, fg_color="transparent")
-        bar.pack(pady=(4, 0))
+        # ── Info Bar ───────────────────────────────────────────────────
+        info_bar = ctk.CTkFrame(self, fg_color="transparent")
+        info_bar.pack(fill="x", padx=28, pady=(10, 0))
+
         self.lbl_agua = ctk.CTkLabel(
-            bar, text="", font=F(8),
+            info_bar, text="", font=F(9),
             text_color=C.AGUA, fg_color="transparent",
         )
-        self.lbl_agua.pack(side="left", padx=4)
+        self.lbl_agua.pack(side="left")
+
         self.lbl_cfg = ctk.CTkLabel(
-            bar, text="", font=F(8),
-            text_color=C.TEXT_DIM, fg_color="transparent",
+            info_bar, text="", font=F(9),
+            text_color=C.TEXT_MUTED, fg_color="transparent",
         )
-        self.lbl_cfg.pack(side="left", padx=4)
+        self.lbl_cfg.pack(side="right")
 
         self._update_cfg_label()
         self._update_stats_label()
         self._update_agua_label()
 
-        # Button row — pill buttons
+        # ── Action Buttons (modern pills) ──────────────────────────────
         bf = ctk.CTkFrame(self, fg_color="transparent")
-        bf.pack(pady=(8, 4))
+        bf.pack(pady=(14, 4))
 
         self.btn_p = ctk.CTkButton(
-            bf, text=_("btn_pausar"), font=F(10),
+            bf, text=_("btn_pausar"), font=F(11, "bold"),
             fg_color=C.BG3, text_color=C.TEXT, hover_color=C.BG4,
-            width=90, height=32, corner_radius=16, border_width=0,
+            width=100, height=38, corner_radius=19, border_width=0,
             command=self._toggle,
         )
-        self.btn_p.pack(side="left", padx=3)
+        self.btn_p.pack(side="left", padx=4)
 
         ctk.CTkButton(
-            bf, text="▶ " + _("pausa_ya"), font=F(10),
-            fg_color=C.ACCENT, text_color=C.BG, hover_color=darken_color(C.ACCENT),
-            width=90, height=32, corner_radius=16, border_width=0,
+            bf, text="▶  " + _("pausa_ya"), font=F(11, "bold"),
+            fg_color=C.ACCENT, text_color="#FFFFFF",
+            hover_color=darken_color(C.ACCENT),
+            width=110, height=38, corner_radius=19, border_width=0,
             command=self._now,
-        ).pack(side="left", padx=3)
+        ).pack(side="left", padx=4)
 
         ctk.CTkButton(
-            bf, text="⏰ " + _("posponer"), font=F(10),
+            bf, text="⏰  " + _("posponer"), font=F(11, "bold"),
             fg_color=C.BG3, text_color=C.TEXT, hover_color=C.BG4,
-            width=90, height=32, corner_radius=16, border_width=0,
+            width=110, height=38, corner_radius=19, border_width=0,
             command=self._posponer,
-        ).pack(side="left", padx=3)
+        ).pack(side="left", padx=4)
 
-        # Minimize
+        # ── Minimize link ──────────────────────────────────────────────
         ctk.CTkButton(
-            self, text=_("minimizar"), font=F(8),
-            fg_color="transparent", text_color=C.TEXT_DIM,
-            hover_color=C.BG3, corner_radius=8, width=60, height=22,
+            self, text=_("minimizar"), font=F(9),
+            fg_color="transparent", text_color=C.TEXT_MUTED,
+            hover_color=C.BG3, corner_radius=8, width=80, height=24,
             cursor="hand2",
             command=self._hide,
-        ).pack(pady=(2, 8))
+        ).pack(pady=(4, 4))
+
+        # ── Extra Buttons Row ─────────────────────────────────────────
+        extra_row = ctk.CTkFrame(self, fg_color="transparent")
+        extra_row.pack(pady=(0, 8))
+
+        ctk.CTkButton(
+            extra_row, text="🏆 " + _("logros"), font=F(9),
+            fg_color=C.BG3, text_color=C.TEXT_DIM, hover_color=C.BG4,
+            width=90, height=28, corner_radius=14,
+            command=lambda: AchievementsWindow(self, self.stats, self.cfg.get("logros_mostrados", [])).center(),
+        ).pack(side="left", padx=3)
+
+        ctk.CTkButton(
+            extra_row, text="🏋️ " + _("workouts"), font=F(9),
+            fg_color=C.BG3, text_color=C.TEXT_DIM, hover_color=C.BG4,
+            width=90, height=28, corner_radius=14,
+            command=self._open_workouts,
+        ).pack(side="left", padx=3)
+
+        ctk.CTkButton(
+            extra_row, text="🤖 IA", font=F(9),
+            fg_color=C.BG3, text_color=C.TEXT_DIM, hover_color=C.BG4,
+            width=70, height=28, corner_radius=14,
+            command=self._open_ai_insights,
+        ).pack(side="left", padx=3)
 
     def _update_cfg_label(self) -> None:
         c = self.cfg
         modo = c.get("modo", "normal").upper()
         self.lbl_cfg.configure(
-            text=f"[{modo}] Cada {c['intervalo_min']} min  -  "
-                 f"Pausa {c['duracion_pausa_min']} min  -  "
-                 f"{c['hora_inicio']} a {c['hora_fin']}",
+            text=f"{modo}  ·  {c['intervalo_min']}m / {c['duracion_pausa_min']}m  ·  "
+                 f"{c['hora_inicio']}–{c['hora_fin']}",
         )
 
     def _update_agua_label(self) -> None:
@@ -527,13 +748,25 @@ class App(ctk.CTk):
         meta: int = self.cfg["meta_pausas"]
         comp: int = s["completadas"]
         comp_color: str = C.GREEN if comp >= meta else (C.YELLOW if comp >= meta // 2 else C.TEXT_DIM)
+
+        # Nivel y XP
+        level, xp, xp_needed = self._get_level()
+        level_text = f"  🎮 Nv.{level}"
+
         self.lbl_stats.configure(
-            text=f"✅ {_('stats_completadas')}: {comp}   ⏭ {_('stats_saltadas')}: {s['saltadas']}",
+            text=f"✅ {comp} completadas  ⏭ {s['saltadas']} saltadas  🔥 {s.get('racha', 0)}d racha{level_text}",
             text_color=comp_color,
         )
-        barra: str = "█" * comp + "░" * (max(0, meta - comp))
-        top: str = f"🎯 {_('stats_cumplida')}" if comp >= meta else f"{comp}/{meta}"
-        self.lbl_meta.configure(text=f"{_('stats_meta_diaria')}: {barra}  {top}", text_color=comp_color)
+        pct = min(100, int(comp / meta * 100)) if meta > 0 else 0
+
+        # Desafío diario
+        challenge = self._get_daily_challenge()
+        completed = self.cfg.get("daily_challenge_completed", "")
+        challenge_icon = "✅" if completed == challenge["id"] else "🎯"
+        challenge_text = f"{challenge_icon} {challenge['title']}"
+
+        top: str = f"🎯 ¡Meta alcanzada!" if comp >= meta else f"{pct}% — {comp}/{meta}"
+        self.lbl_meta.configure(text=f"{top}  ·  {challenge_text}", text_color=comp_color)
         self._draw_week_chart()
 
     def _draw_week_chart(self) -> None:
@@ -565,12 +798,29 @@ class App(ctk.CTk):
             self.attributes("-alpha", 0.0)
             self.deiconify()
             for i in range(1, 11):
-                self.after(i * 15, lambda v=i / 10: self.attributes("-alpha", v))
+                self.after(i * 15, lambda v=i / 10: self._safe_set_alpha(v))
         except Exception:
-            self.deiconify()
+            try:
+                self.deiconify()
+            except Exception:
+                pass
+
+    def _safe_set_alpha(self, alpha: float) -> None:
+        try:
+            if self.winfo_exists():
+                self.attributes("-alpha", alpha)
+        except Exception:
+            pass
 
     def _center(self) -> None:
-        center_window(self)
+        self.update_idletasks()
+        w = self.winfo_width()
+        h = self.winfo_height()
+        sw = self.winfo_screenwidth()
+        sh = self.winfo_screenheight()
+        x = (sw - w) // 2
+        y = (sh - h) // 3  # Un poco más arriba del centro para verse mejor
+        self.geometry(f"+{x}+{y}")
 
     @staticmethod
     def _fmt_time(s: int) -> str:
@@ -622,6 +872,10 @@ class App(ctk.CTk):
                 self._job = self.after(1000, self._tick)
                 return
 
+            # Auto night mode check (cada 5 min)
+            if self.remaining % 300 == 0:
+                self._check_auto_night_mode()
+
             if self.cfg.get("fin_de_semana", False) and self._is_weekend():
                 self.lbl_st.configure(text=_("fin_semana"))
                 self._canvas.itemconfig("cd_text", text="--:--", fill=C.TEXT_DIM)
@@ -654,14 +908,7 @@ class App(ctk.CTk):
                 self._update_tray()
 
             if self.remaining <= 0:
-                if self.cfg.get("no_molestar", True) and self._is_fullscreen():
-                    self.lbl_st.configure(text=_("pospuesto_fullscreen"))
-                    self.badge_frame.configure(fg_color=C.YELLOW)
-                    self.lbl_badge.configure(text=_("no_molestar").upper(), text_color=C.BG)
-                    self._total_sec = 5 * 60
-                    self.remaining = self._total_sec
-                else:
-                    self._trigger_pausa()
+                self._trigger_pausa()
             else:
                 self.remaining -= 1
 
@@ -675,33 +922,6 @@ class App(ctk.CTk):
     def _is_weekend() -> bool:
         return datetime.now().weekday() >= 5
 
-    @staticmethod
-    def _is_fullscreen() -> bool:
-        import ctypes
-        try:
-            state = ctypes.c_int(0)
-            ctypes.windll.shell32.SHQueryUserNotificationState(ctypes.byref(state))
-            if state.value in (5, 4):
-                return True
-        except Exception:
-            pass
-        try:
-            user32 = ctypes.windll.user32
-            hwnd = user32.GetForegroundWindow()
-            if not hwnd:
-                return False
-            rect = ctypes.wintypes.RECT()
-            user32.GetWindowRect(hwnd, ctypes.byref(rect))
-            fw = rect.right - rect.left
-            fh = rect.bottom - rect.top
-            sw = user32.GetSystemMetrics(0)
-            sh = user32.GetSystemMetrics(1)
-            if fw >= sw * 0.95 and fh >= sh * 0.95:
-                return True
-        except Exception:
-            pass
-        return False
-
     def _trigger_pausa(self) -> None:
         try:
             if self.pausa_open:
@@ -711,11 +931,11 @@ class App(ctk.CTk):
             self._show()
             sonido = self.cfg.get("sonido", True)
             if sonido:
-                threading.Thread(target=audio_manager.play_alert, daemon=True).start()
+                threading.Thread(target=get_audio_manager().play_alert, daemon=True).start()
             self.after(0, lambda: send_win_notification(
                 APP_DISPLAY,
                 _("break_time_body"),
-                sound="None" if sonido else self.cfg.get("notificacion_sonido", "default"),
+                sound=self.cfg.get("notificacion_sonido", "default") if sonido else "None",
                 duration=self.cfg.get("notificacion_duracion", "short"),
             ))
             activos = [
@@ -727,9 +947,10 @@ class App(ctk.CTk):
             ej = random.choice(activos)
             self._last_ej = ej["nombre"]
             dur: int = self._get_duration() * 60
-            PausaWindow(
+            BreakWindow(
                 self, ej, dur, self._done_pausa, self._skip_pausa,
                 sonido_ambiente=self.cfg.get("sonido_ambiente", "ninguno"),
+                guia_voz=self.cfg.get("guia_voz", True),
             )
         except Exception as ex:
             log.exception("Error en _trigger_pausa: %s", ex)
@@ -748,6 +969,14 @@ class App(ctk.CTk):
             "ejercicio": self._last_ej,
             "estado": "completada",
         })
+
+        # Mini-interacciones: confetti + XP
+        self._spawn_confetti(35)
+        self._spawn_sparkles(6)
+        self._add_xp(25)
+        self._check_daily_challenge()
+        self._on_break_done_pet()
+
         meta: int = self.cfg["meta_pausas"]
         if self.stats["completadas"] == meta:
             self.stats["meta_cumplida"] = True
@@ -761,6 +990,7 @@ class App(ctk.CTk):
             now.strftime("%Y-%m-%d"), now.strftime("%H:%M"),
             self._last_ej, "completada",
         ])
+        self._cfg_mgr.trim_csv()
         self.lbl_st.configure(text=get_random_phrase())
         self._update_tray()
 
@@ -783,6 +1013,7 @@ class App(ctk.CTk):
             now.strftime("%Y-%m-%d"), now.strftime("%H:%M"),
             self._last_ej, "saltada",
         ])
+        self._cfg_mgr.trim_csv()
         self.lbl_st.configure(text=_("pausa_saltada"))
         self._update_tray()
 
@@ -808,6 +1039,24 @@ class App(ctk.CTk):
         self._total_sec = mins * 60
         self.remaining = self._total_sec
         self.lbl_st.configure(text=_("pausa_pospuesta").format(mins=mins))
+
+    def _hotkey_break_now(self) -> None:
+        self.after(0, self._now)
+
+    def _hotkey_snooze(self) -> None:
+        self.after(0, self._posponer)
+
+    def _hotkey_pause_resume(self) -> None:
+        self.after(0, self._toggle)
+
+    def _hotkey_show_hide(self) -> None:
+        if self.winfo_viewable():
+            self.after(0, self._hide)
+        else:
+            self.after(0, self._show)
+
+    def _hotkey_quit(self) -> None:
+        self.after(0, self._quit)
 
     def _manual_update_check(self) -> None:
         self.lbl_st.configure(text=_("buscando_updates"))
@@ -876,7 +1125,11 @@ class App(ctk.CTk):
         self.lbl_st.configure(text=_("err_update"))
 
     def _install_update(self, new_exe: str) -> None:
-        current_exe: str = self._app_path
+        # Use install dir from registry if available
+        install_dir = _get_install_dir_from_registry() or self._app_dir
+        current_exe: str = os.path.join(install_dir, os.path.basename(self._app_path))
+        if not os.path.exists(current_exe):
+            current_exe = self._app_path
         if not getattr(sys, "frozen", False):
             import tkinter.messagebox as mb
             mb.showinfo(
@@ -904,11 +1157,291 @@ class App(ctk.CTk):
         import subprocess
         subprocess.Popen(["cmd", "/c", bat], creationflags=0x08000000)
         self._water.stop()
-        audio_manager.stop_ambient()
+        get_audio_manager().cleanup()
         if self._tray:
             self._tray.stop()
         self.destroy()
         sys.exit(0)
+
+    # ════════════════════════════════════════════════════════════════════════
+    # MINI-INTERACCIONES: Partículas, Sparkles, Confetti
+    # ════════════════════════════════════════════════════════════════════════
+
+    def _start_particle_animation(self) -> None:
+        self._animate_particles()
+
+    def _animate_particles(self) -> None:
+        try:
+            if not self.winfo_exists():
+                return
+            canvas = self._canvas
+            cx, cy, r = 110, 110, 95
+
+            # Limpiar partículas anteriores
+            canvas.delete("particle")
+            canvas.delete("sparkle")
+            canvas.delete("confetti")
+
+            self._anim_frame += 1
+
+            # Partículas flotantes alrededor del reloj
+            if self.running and not self.pausa_open and self.remaining > 0:
+                import math
+                num_particles = 6
+                for i in range(num_particles):
+                    angle = (self._anim_frame * 0.02 + i * (2 * math.pi / num_particles))
+                    dist = r + 15 + math.sin(angle * 2) * 8
+                    px = cx + math.cos(angle) * dist
+                    py = cy + math.sin(angle) * dist
+                    size = 2 + math.sin(angle * 3 + self._anim_frame * 0.1) * 1.5
+                    alpha = 0.3 + math.sin(angle + self._anim_frame * 0.05) * 0.3
+                    color = C.ACCENT if i % 2 == 0 else C.GREEN
+                    canvas.create_oval(
+                        px - size, py - size, px + size, py + size,
+                        fill=color, outline="", tags="particle",
+                    )
+
+            # Sparkles cuando la meta se acerca
+            if self.running and self.remaining > 0:
+                total = self._total_sec if self._total_sec else 1
+                pct = self.remaining / total
+                if pct < 0.15:  # Últimos 15%
+                    import random
+                    for _ in range(2):
+                        angle = random.uniform(0, 2 * math.pi)
+                        dist = r + random.uniform(-5, 5)
+                        sx = cx + math.cos(angle) * dist
+                        sy = cy + math.sin(angle) * dist
+                        size = random.uniform(1, 3)
+                        canvas.create_oval(
+                            sx - size, sy - size, sx + size, sy + size,
+                            fill=C.YELLOW, outline="", tags="sparkle",
+                        )
+
+            # Confetti cuando se completa
+            for c in self._confetti[:]:
+                c["y"] += c["vy"]
+                c["x"] += c["vx"]
+                c["vy"] += 0.1  # gravedad
+                c["rotation"] += c["vr"]
+                if c["y"] > 250:
+                    self._confetti.remove(c)
+                    continue
+                canvas.create_rectangle(
+                    c["x"] - 3, c["y"] - 2, c["x"] + 3, c["y"] + 2,
+                    fill=c["color"], outline="", tags="confetti",
+                )
+
+            self.after(50, self._animate_particles)
+        except Exception:
+            self.after(100, self._animate_particles)
+
+    def _spawn_confetti(self, count: int = 40) -> None:
+        import random
+        colors = [C.ACCENT, C.GREEN, C.YELLOW, "#EF4444", "#8B5CF6", "#EC4899"]
+        for _ in range(count):
+            self._confetti.append({
+                "x": random.uniform(30, 190),
+                "y": random.uniform(-20, 30),
+                "vx": random.uniform(-2, 2),
+                "vy": random.uniform(1, 3),
+                "color": random.choice(colors),
+                "rotation": random.uniform(0, 360),
+                "vr": random.uniform(-5, 5),
+            })
+
+    def _spawn_sparkles(self, count: int = 8) -> None:
+        import random
+        canvas = self._canvas
+        cx, cy, r = 110, 110, 95
+        for _ in range(count):
+            angle = random.uniform(0, 2 * math.pi)
+            dist = r + random.uniform(-10, 10)
+            sx = cx + math.cos(angle) * dist
+            sy = cy + math.sin(angle) * dist
+            size = random.uniform(2, 5)
+            canvas.create_text(
+                sx, sy, text="✨", font=("Segoe UI Emoji", int(size * 3)),
+                tags="sparkle",
+            )
+
+    # ════════════════════════════════════════════════════════════════════════
+    # SISTEMA DE NIVELES
+    # ════════════════════════════════════════════════════════════════════════
+
+    def _get_level(self) -> tuple[int, int, int]:
+        xp = self.stats.get("xp", 0)
+        level = 1
+        xp_needed = 100
+        while xp >= xp_needed:
+            xp -= xp_needed
+            level += 1
+            xp_needed = int(xp_needed * 1.5)
+        return level, xp, xp_needed
+
+    def _add_xp(self, amount: int) -> None:
+        old_level, _, _ = self._get_level()
+        self.stats["xp"] = self.stats.get("xp", 0) + amount
+        new_level, _, _ = self._get_level()
+        if new_level > old_level:
+            self._spawn_confetti(30)
+            toast("🎉 ¡Nivel aumentado!", f"¡Ahora eres nivel {new_level}!", kind="exito")
+
+    # ════════════════════════════════════════════════════════════════════════
+    # DESAFÍOS DIARIOS
+    # ════════════════════════════════════════════════════════════════════════
+
+    DAILY_CHALLENGES = [
+        {"id": "early_bird", "title": "🌅 Madrugador", "desc": "Completa una pausa antes de las 9am", "xp": 50},
+        {"id": "double", "title": "💪 Doble", "desc": "Completa 2 pausas en 1 hora", "xp": 30},
+        {"id": "streak3", "title": "🔥 Racha x3", "desc": "Consigue una racha de 3 días", "xp": 75},
+        {"id": "all_exercises", "title": "🏃 Variedad", "desc": "Usa 3 ejercicios diferentes hoy", "xp": 40},
+        {"id": "posture", "title": "🧘 Postura perfecta", "desc": "Activa el recordatorio de postura", "xp": 25},
+        {"id": "hydration", "title": "💧 Hidratado", "desc": "Responde 3 recordatorios de agua", "xp": 35},
+        {"id": "complete_all", "title": "🏆 Día completo", "desc": "Alcanza tu meta diaria de pausas", "xp": 100},
+        {"id": "night_owl", "title": "🦉 Búhu nocturno", "desc": "Completa una pausa después de las 8pm", "xp": 50},
+    ]
+
+    def _get_daily_challenge(self) -> dict:
+        import datetime
+        today = datetime.date.today().toordinal()
+        idx = today % len(self.DAILY_CHALLENGES)
+        return self.DAILY_CHALLENGES[idx]
+
+    def _check_daily_challenge(self) -> None:
+        challenge = self._get_daily_challenge()
+        completed = self.cfg.get("daily_challenge_completed", "")
+        if completed == challenge["id"]:
+            return
+        cid = challenge["id"]
+        success = False
+        if cid == "early_bird":
+            success = self.stats.get("completadas", 0) > 0
+        elif cid == "complete_all":
+            success = self.stats.get("completadas", 0) >= self.cfg.get("meta_pausas", 6)
+        elif cid == "posture":
+            success = self.cfg.get("postura_recordatorio", False)
+
+        if success:
+            self.cfg["daily_challenge_completed"] = challenge["id"]
+            self._add_xp(challenge["xp"])
+            self._spawn_confetti(25)
+            toast("🎯 ¡Desafío completado!", f"{challenge['title']}: +{challenge['xp']} XP", kind="exito")
+
+    # ════════════════════════════════════════════════════════════════════════
+    # FRASES MOTIVACIONALES ANIMADAS (typewriter)
+    # ════════════════════════════════════════════════════════════════════════
+
+    def _animate_phrase(self, phrase: str, label: ctk.CTkLabel, idx: int = 0) -> None:
+        try:
+            if not self.winfo_exists():
+                return
+            if idx <= len(phrase):
+                label.configure(text=phrase[:idx])
+                self.after(40, lambda: self._animate_phrase(phrase, label, idx + 1))
+        except Exception:
+            pass
+
+    # ════════════════════════════════════════════════════════════════════════
+    # MODO NOCTURNO AUTOMÁTICO
+    # ════════════════════════════════════════════════════════════════════════
+
+    def _check_auto_night_mode(self) -> None:
+        hour = datetime.now().hour
+        if 20 <= hour or hour < 7:
+            if self.cfg.get("tema") != "oscuro":
+                self.cfg["tema"] = "oscuro"
+                set_theme("oscuro", self.cfg.get("color_acento", "azul"), self.cfg.get("fondo", "estandar"))
+
+    # ════════════════════════════════════════════════════════════════════════
+    # COMPARATIVA SEMANAL
+    # ════════════════════════════════════════════════════════════════════════
+
+    def _get_weekly_comparison(self) -> tuple[int, int]:
+        import datetime
+        today = datetime.date.today()
+        this_week = self.stats.get("completadas", 0)
+        last_week = self.stats.get("last_week_completadas", 0)
+        return this_week, last_week
+
+    def _save_weekly_snapshot(self) -> None:
+        import datetime
+        today = datetime.date.today()
+        if today.weekday() == 0:  # Lunes
+            self.cfg["last_week_completadas"] = self.stats.get("completadas", 0)
+
+    # ════════════════════════════════════════════════════════════════════════
+    # MODO MEDITACIÓN (respiración guiada)
+    # ════════════════════════════════════════════════════════════════════════
+
+    def _start_meditation(self) -> None:
+        self._meditation_active = True
+        self._meditation_phase = 0  # 0=inhalar, 1=retener, 2=exhalar
+        self._meditation_timer = 0
+        self._meditation_cycle = 0
+        self._animate_meditation()
+
+    def _animate_meditation(self) -> None:
+        if not getattr(self, "_meditation_active", False):
+            return
+        phases = [("Inhala... 4s", 4), ("Retén... 4s", 4), ("Exhala... 6s", 6)]
+        phase_name, phase_dur = phases[self._meditation_phase % 3]
+        self.lbl_st.configure(text=phase_name)
+
+        canvas = self._canvas
+        cx, cy = 110, 110
+        canvas.delete("meditation")
+        size = 20 + self._meditation_timer * 8
+        canvas.create_oval(
+            cx - size, cy - size, cx + size, cy + size,
+            outline=C.ACCENT, width=2, tags="meditation",
+        )
+
+        self._meditation_timer += 1
+        if self._meditation_timer >= phase_dur:
+            self._meditation_timer = 0
+            self._meditation_phase += 1
+            if self._meditation_phase >= 3:
+                self._meditation_phase = 0
+                self._meditation_cycle += 1
+                if self._meditation_cycle >= 5:
+                    self._meditation_active = false
+                    canvas.delete("meditation")
+                    self.lbl_st.configure(text="Meditación completada 🧘")
+                    return
+
+        self.after(1000, self._animate_meditation)
+
+    # ════════════════════════════════════════════════════════════════════════
+    # RECORDATORIO 20-20-20 (ojos)
+    # ════════════════════════════════════════════════════════════════════════
+
+    def _schedule_eye_reminder(self) -> None:
+        if self.cfg.get("eye_reminder", False):
+            ms = 20 * 60 * 1000  # 20 minutos
+            self.after(ms, self._eye_reminder_notify)
+
+    def _eye_reminder_notify(self) -> None:
+        if not self.running:
+            return
+        toast("👁️ Regla 20-20-20",
+              "Mira algo a 6+ metros por 20 segundos", kind="info", duration=8000)
+        self._schedule_eye_reminder()
+
+    # ════════════════════════════════════════════════════════════════════════
+    # SPOTIFY (placeholder - detecta si está reproduciendo)
+    # ════════════════════════════════════════════════════════════════════════
+
+    def _check_spotify(self) -> bool:
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["tasklist", "/FI", "IMAGENAME eq spotify.exe"],
+                capture_output=True, text=True, timeout=3
+            )
+            return "spotify.exe" in result.stdout.lower()
+        except Exception:
+            return False
 
     def _reapply_theme(self) -> None:
         """Rebuild UI after theme change so all widgets pick up new colors."""
@@ -925,31 +1458,197 @@ class App(ctk.CTk):
         self._update_tray()
         self._water.restart()
 
+        # Update posture reminder
+        if self.cfg.get("postura_recordatorio", False):
+            self._posture.start(self.cfg.get("postura_intervalo_min", 20))
+        else:
+            self._posture.stop()
+
+        # Update floating timer
+        if self.cfg.get("floating_enabled", False) and (not self._floating or not self._floating.winfo_exists()):
+            self._create_floating_timer()
+        elif not self.cfg.get("floating_enabled", False) and self._floating and self._floating.winfo_exists():
+            self._floating.destroy()
+            self._floating = None
+
+        # Update compact mode
+        if self.cfg.get("compacto_enabled", False) and (not self._compact or not self._compact.winfo_exists()):
+            self._create_compact_window()
+        elif not self.cfg.get("compacto_enabled", False) and self._compact and self._compact.winfo_exists():
+            self._compact.destroy()
+            self._compact = None
+
+    def _open_workouts(self) -> None:
+        workouts = self.cfg.get("workouts", [])
+        WorkoutWindow(
+            self, workouts, EJERCICIOS,
+            lambda wo: self.cfg.update({"workouts": wo}) or self._cfg_mgr.save_config(self.cfg),
+            self._run_workout,
+        ).center()
+
+    def _run_workout(self, wo: dict) -> None:
+        toast(_("workout"), f"Rutina: {wo['nombre']}", kind="info")
+
+    def _open_custom_exercise(self) -> None:
+        def on_save(ej: dict) -> None:
+            EJERCICIOS.append(ej)
+            activos = self.cfg.get("ejercicios_activos", [])
+            activos.append(ej["id"])
+            self.cfg["ejercicios_activos"] = activos
+            self._cfg_mgr.save_config(self.cfg)
+            toast(_("toast_exito"), f"Ejercicio '{ej['nombre']}' creado", kind="exito")
+        CustomExerciseWindow(self, on_save).center()
+
+    # ── FlowBuddy - Mascota Virtual ──────────────────────────────────
+
+    def _start_pet_decay(self) -> None:
+        """Reduce stats de la mascota cada 30 min si no haces pausas."""
+        def _decay():
+            try:
+                now = datetime.now().timestamp()
+                last_break = self._pet_state.get("ultimo_alimento", now)
+                hours_since = (now - last_break) / 3600
+
+                if hours_since > 1:
+                    self._pet_state["energia"] = max(0, self._pet_state.get("energia", 100) - int(hours_since * 5))
+                    self._pet_state["felicidad"] = max(0, self._pet_state.get("felicidad", 100) - int(hours_since * 3))
+
+                if hasattr(self, "_buddy_widget") and self._buddy_widget.winfo_exists():
+                    self._buddy_widget.update_state(self._pet_state)
+                self.cfg["pet_state"] = self._pet_state
+            except Exception:
+                pass
+            self._pet_decay_job = self.after(30 * 60 * 1000, _decay)
+        self._pet_decay_job = self.after(30 * 60 * 1000, _decay)
+
+    def _feed_pet(self) -> None:
+        self._pet_state["energia"] = min(100, self._pet_state.get("energia", 100) + 20)
+        self._pet_state["felicidad"] = min(100, self._pet_state.get("felicidad", 100) + 10)
+        self._pet_state["ultimo_alimento"] = datetime.now().timestamp()
+        self.cfg["pet_state"] = self._pet_state
+        toast("🐾 FlowBuddy", "¡FlowBuddy está feliz! +20 energía", kind="exito")
+        if hasattr(self, "_buddy_widget") and self._buddy_widget.winfo_exists():
+            self._buddy_widget.update_state(self._pet_state)
+
+    def _play_with_pet(self) -> None:
+        self._pet_state["felicidad"] = min(100, self._pet_state.get("felicidad", 100) + 25)
+        self._pet_state["energia"] = max(0, self._pet_state.get("energia", 100) - 10)
+        self.cfg["pet_state"] = self._pet_state
+        toast("🐾 FlowBuddy", "¡FlowBuddy jugó contigo! +25 felicidad", kind="info")
+        if hasattr(self, "_buddy_widget") and self._buddy_widget.winfo_exists():
+            self._buddy_widget.update_state(self._pet_state)
+
+    def _on_break_done_pet(self) -> None:
+        """Llamar cuando se completa una pausa para mejorar al pet."""
+        self._pet_state["energia"] = min(100, self._pet_state.get("energia", 100) + 15)
+        self._pet_state["felicidad"] = min(100, self._pet_state.get("felicidad", 100) + 20)
+        self._pet_state["salud"] = min(100, self._pet_state.get("salud", 100) + 5)
+        self._pet_state["ultimo_alimento"] = datetime.now().timestamp()
+        self.cfg["pet_state"] = self._pet_state
+
+    def _open_flowbuddy(self) -> None:
+        FlowBuddyWindow(
+            self, self._pet_state,
+            on_feed=self._feed_pet,
+            on_play=self._play_with_pet,
+        ).center()
+
+    # ── AI Insights ──────────────────────────────────────────────────
+
+    def _open_ai_insights(self) -> None:
+        insights = self._ai_engine.analyze()
+        AIInsightsWindow(self, insights).center()
+
     def _open_config(self) -> None:
         def on_save(c: dict[str, Any]) -> None:
             old_tema = self.cfg.get("tema")
             old_font = self.cfg.get("tamano_letra")
+            old_accent = self.cfg.get("color_acento")
+            old_fondo = self.cfg.get("fondo")
             self.cfg = c
             self._total_sec = c["intervalo_min"] * 60
             self.remaining = self._total_sec
             self._cfg_mgr.save_config(c)
-            if c.get("tema") != old_tema or c.get("tamano_letra") != old_font or c.get("color_acento") != self.cfg.get("color_acento"):
+            if c.get("tema") != old_tema or c.get("tamano_letra") != old_font or c.get("color_acento") != old_accent or c.get("fondo") != old_fondo:
                 if c.get("tamano_letra") != old_font:
                     set_font_size(c.get("tamano_letra", "normal"))
                 self._reapply_theme()
             else:
                 self._update_cfg_label()
                 self._update_agua_label()
+
+            # Floating timer
+            if c.get("floating_enabled", False) and (not self._floating or not self._floating.winfo_exists()):
+                self._create_floating_timer()
+            elif not c.get("floating_enabled", False) and self._floating and self._floating.winfo_exists():
+                self._floating.destroy()
+                self._floating = None
+
+            # Compact window
+            if c.get("compacto_enabled", False) and (not self._compact or not self._compact.winfo_exists()):
+                self._create_compact_window()
+            elif not c.get("compacto_enabled", False) and self._compact and self._compact.winfo_exists():
+                self._compact.destroy()
+                self._compact = None
+
             self._water.restart()
         profiles: list[str] = self._cfg_mgr.list_profiles()
         ConfigWindow(self, self.cfg, on_save, self._app_path, profiles=profiles)
 
     def _open_stats(self) -> None:
         history = self._cfg_mgr.get_stats_history()
-        StatsWindow(
+        StatsWindowEnhanced(
             self, self.stats, self.cfg["meta_pausas"],
             self._hist_file, history=history,
+            on_export=self._export_stats,
+            on_import=self._import_stats,
         )
+
+    def _export_stats(self) -> None:
+        try:
+            from tkinter import filedialog
+            path = filedialog.asksaveasfilename(
+                defaultextension=".json",
+                filetypes=[("JSON", "*.json")],
+                title=_("exportar_stats"),
+            )
+            if path:
+                import json
+                data = {
+                    "stats": self.stats,
+                    "config": {k: v for k, v in self.cfg.items() if not k.startswith("_")},
+                    "history": self._cfg_mgr.load_stats(),
+                }
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                toast(_("toast_exito"), _("exportar_ok").format(path=path), kind="exito")
+        except Exception as e:
+            toast(_("error"), str(e), kind="error")
+
+    def _import_stats(self) -> None:
+        try:
+            from tkinter import filedialog
+            path = filedialog.askopenfilename(
+                filetypes=[("JSON", "*.json")],
+                title=_("importar_stats"),
+            )
+            if path:
+                import json
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if "stats" in data:
+                    self.stats.update(data["stats"])
+                    self._cfg_mgr.save_stats(self.stats)
+                if "config" in data:
+                    for k, v in data["config"].items():
+                        if k in self.cfg:
+                            self.cfg[k] = v
+                    self._cfg_mgr.save_config(self.cfg)
+                if "history" in data:
+                    self._cfg_mgr.save_stats(data["history"])
+                toast(_("toast_exito"), _("importar_ok"), kind="exito")
+        except Exception as e:
+            toast(_("error"), _("importar_error").format(error=str(e)), kind="error")
 
     def _open_uninstall(self) -> None:
         UninstallWindow(
