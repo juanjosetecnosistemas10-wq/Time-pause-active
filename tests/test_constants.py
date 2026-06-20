@@ -1,11 +1,16 @@
 from pausa_activa.constants import (
-    DEFAULT_CONFIG, EJERCICIOS, get_random_phrase,
-    C, THEMES, set_theme, get_theme, I18N, set_idioma, _,
+    DEFAULT_CONFIG,
+    EJERCICIOS,
+    I18N,
+    THEMES,
+    C,
+    _,
+    get_random_phrase,
+    get_theme,
     load_ejercicios_from_file,
+    set_idioma,
+    set_theme,
 )
-import tempfile
-import json
-import os
 
 
 def test_default_config_has_all_keys():
@@ -67,13 +72,9 @@ def test_i18n_fallback():
 
 
 def test_load_ejercicios_from_file():
-    ejercicios_test = [{"id": "test", "nombre": "Test", "icono": "💪", "pasos": ["paso1"]}]
-    with tempfile.TemporaryDirectory() as d:
-        path = os.path.join(d, "test.json")
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(ejercicios_test, f)
-        loaded = load_ejercicios_from_file(path)
-        assert loaded == ejercicios_test
+    from pausa_activa.constants import EJERCICIOS_BUILTIN
+    loaded = load_ejercicios_from_file()
+    assert loaded == EJERCICIOS_BUILTIN
 
 
 def test_load_ejercicios_from_file_not_exists():

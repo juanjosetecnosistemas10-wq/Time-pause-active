@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import threading
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any
 
 from pausa_activa.constants import log
 
@@ -16,8 +17,8 @@ except ImportError:
 
 class HotkeyManager:
     def __init__(self) -> None:
-        self._listener: Optional[Any] = None
-        self._hotkeys: Dict[str, dict[str, Any]] = {}
+        self._listener: Any = None
+        self._hotkeys: dict[str, dict[str, Any]] = {}
         self._enabled: bool = True
         self._lock = threading.Lock()
 
@@ -25,25 +26,57 @@ class HotkeyManager:
         """Register a hotkey. Combo format: '<ctrl>+<alt>+b'"""
         with self._lock:
             self._hotkeys[name] = {"combo": combo, "callback": callback}
-        log.debug("Registered hotkey: %s -> %s", name, combo)
 
     def unregister(self, name: str) -> None:
         with self._lock:
             self._hotkeys.pop(name, None)
 
     def set_enabled(self, enabled: bool) -> None:
-        self._enabled = enabled
+        with self._lock:
+            self._enabled = enabled
 
     def start(self) -> None:
         if not PYNPUT_AVAILABLE:
             log.warning("pynput no disponible, hotkeys globales desactivadas")
             return
-        if self._listener and self._listener.is_alive():
-            return
+        with self._lock:
+            if self._listener:
+                return
+            self._listener = self._build_listener()
+        log.info("Global hotkeys started using pynput.keyboard.GlobalHotKeys")
 
+    def stop(self) -> None:
+        listener = None
+        with self._lock:
+            listener = self._listener
+            self._listener = None
+        if listener:
+            try:
+                listener.stop()
+            except Exception:
+                log.debug("Error stopping hotkey listener")
+        log.info("Global hotkeys stopped")
+
+    def reload(self) -> None:
+        """Rebuild the listener with the current hotkey mapping."""
+        with self._lock:
+            old = self._listener
+            self._listener = None
+        if old:
+            try:
+                old.stop()
+            except Exception:
+                pass
+        with self._lock:
+            self._listener = self._build_listener()
+        log.debug("Hotkey listener reloaded")
+
+    def _build_listener(self) -> Any:
         def wrap_callback(cb: Callable[[], None]) -> Callable[[], None]:
             def wrapper() -> None:
-                if self._enabled:
+                with self._lock:
+                    enabled = self._enabled
+                if enabled:
                     try:
                         cb()
                     except Exception as e:
@@ -51,23 +84,13 @@ class HotkeyManager:
             return wrapper
 
         mapping = {}
-        with self._lock:
-            for entry in self._hotkeys.values():
-                mapping[entry["combo"]] = wrap_callback(entry["callback"])
+        for entry in self._hotkeys.values():
+            mapping[entry["combo"]] = wrap_callback(entry["callback"])
 
-        self._listener = keyboard.GlobalHotKeys(mapping)
-        self._listener.daemon = True
-        self._listener.start()
-        log.info("Global hotkeys started using pynput.keyboard.GlobalHotKeys")
-
-    def stop(self) -> None:
-        if self._listener:
-            try:
-                self._listener.stop()
-            except Exception:
-                log.debug("Error stopping hotkey listener")
-            self._listener = None
-            log.info("Global hotkeys stopped")
+        listener = keyboard.GlobalHotKeys(mapping)
+        listener.daemon = True
+        listener.start()
+        return listener
 
 
 DEFAULT_HOTKEYS = {

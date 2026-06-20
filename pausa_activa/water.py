@@ -5,15 +5,17 @@ from __future__ import annotations
 import threading
 import time
 import winsound
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from pausa_activa.constants import _, log
 from pausa_activa.notifications import send_win_notification
 
 
 class WaterReminder:
-    def __init__(self, cfg_getter: Callable[[], dict[str, Any]]) -> None:
+    def __init__(self, cfg_getter: Callable[[], dict[str, Any]], on_notify: Callable[[], None] | None = None) -> None:
         self._cfg_getter: Callable[[], dict[str, Any]] = cfg_getter
+        self._on_notify: Callable[[], None] | None = on_notify
         self._stop: threading.Event = threading.Event()
         self._thread: threading.Thread | None = None
         self._lock: threading.Lock = threading.Lock()
@@ -60,10 +62,13 @@ class WaterReminder:
                     sound=cfg.get("notificacion_sonido", "default"),
                     duration=cfg.get("notificacion_duracion", "short"),
                 )
+                if self._on_notify:
+                    try:
+                        self._on_notify()
+                    except Exception:
+                        pass
                 try:
-                    winsound.Beep(440, 200)
-                    time.sleep(0.1)
-                    winsound.Beep(550, 200)
+                    threading.Thread(target=lambda: (winsound.Beep(440, 200), time.sleep(0.1), winsound.Beep(550, 200)), daemon=True).start()
                 except Exception:
                     pass
             except Exception as exc:

@@ -10,15 +10,16 @@ APP_DIR = os.path.dirname(APP_PATH)
 if __name__ == "__main__":
     # Handle --uninstall flag
     if "--uninstall" in sys.argv:
+        import tkinter as tk
+        import tkinter.messagebox as mb
+
         from pausa_activa.installer import (
-            _get_install_dir_from_registry,
             _eliminar_accesos_directos,
+            _get_install_dir_from_registry,
             _programar_borrado_carpeta,
             _quitar_registro_desinstalador,
         )
         from pausa_activa.windows import set_autoarranque
-        import tkinter.messagebox as mb
-        import tkinter as tk
 
         root = tk.Tk()
         root.withdraw()

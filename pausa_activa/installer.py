@@ -10,13 +10,19 @@ import tempfile
 import tkinter as tk
 import tkinter.messagebox as mb
 import winreg
-from tkinter import ttk
-from typing import Callable
+from collections.abc import Callable
 
 import customtkinter as ctk
 
 from pausa_activa.constants import (
-    C, APP_DISPLAY, APP_NAME, INSTALL_DIR_REG, _, log, center_window, darken_color, F,
+    APP_DISPLAY,
+    APP_NAME,
+    INSTALL_DIR_REG,
+    C,
+    F,
+    _,
+    center_window,
+    darken_color,
 )
 
 

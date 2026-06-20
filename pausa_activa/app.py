@@ -2,38 +2,61 @@
 
 from __future__ import annotations
 
+import math
 import os
 import random
 import sys
 import threading
-import tkinter as tk
-import customtkinter as ctk
-from datetime import datetime
+from datetime import date, datetime
 from tkinter import Canvas
-from typing import Any, Callable
+from typing import Any
 
-from pausa_activa.constants import (
-    C, APP_NAME, APP_DISPLAY, __version__, UPDATER_REPO,
-    EJERCICIOS, set_theme, set_idioma, get_random_phrase,
-    darken_color, F, set_font_size,
-    _,
-    log, center_window,
-)
-from pausa_activa.config import ConfigManager
+import customtkinter as ctk
+
 from pausa_activa.audio import AudioManager
-from pausa_activa.water import WaterReminder
-from pausa_activa.notifications import send_win_notification
-from pausa_activa.installer import InstallerWindow, _is_installed, _get_install_dir_from_registry
-from pausa_activa.windows import (
-    BreakWindow, StatsWindow, ConfigWindow, WelcomeWindow, UninstallWindow,
-    draw_bar_chart, get_audio_manager,
-    ToastNotification, toast, FloatingTimer, CompactWindow, FullscreenTimer,
-    AchievementsWindow, check_achievements, ACHIEVEMENTS,
-    CustomExerciseWindow, WorkoutWindow, TutorialWindow, PostureReminder,
-    StatsWindowEnhanced,
-    FlowBuddyWidget, FlowBuddyWindow, AIInsightsWindow, AIEngine,
+from pausa_activa.config import ConfigManager
+from pausa_activa.constants import (
+    APP_DISPLAY,
+    APP_NAME,
+    EJERCICIOS,
+    UPDATER_REPO,
+    WELLNESS_NOTES,
+    C,
+    F,
+    _,
+    __version__,
+    darken_color,
+    get_random_phrase,
+    log,
+    set_font_size,
+    set_idioma,
+    set_theme,
 )
-from pausa_activa.hotkeys import HotkeyManager, create_default_manager
+from pausa_activa.hotkeys import create_default_manager
+from pausa_activa.installer import InstallerWindow, _get_install_dir_from_registry, _is_installed
+from pausa_activa.notifications import send_win_notification
+from pausa_activa.water import WaterReminder
+from pausa_activa.windows import (
+    AchievementsWindow,
+    AIEngine,
+    AIInsightsWindow,
+    BreakWindow,
+    CompactWindow,
+    ConfigWindow,
+    CustomExerciseWindow,
+    FloatingTimer,
+    FlowBuddyWindow,
+    PostureReminder,
+    StatsWindowEnhanced,
+    TutorialWindow,
+    UninstallWindow,
+    WelcomeWindow,
+    WorkoutWindow,
+    check_achievements,
+    draw_bar_chart,
+    get_audio_manager,
+    toast,
+)
 
 try:
     import pystray
@@ -98,7 +121,10 @@ class Updater:
 
     @staticmethod
     def _parse_version(tag: str) -> tuple[int, ...]:
-        return tuple(int(x) for x in tag.lstrip("vV").replace("-", ".").split("."))
+        try:
+            return tuple(int(x) for x in tag.lstrip("vV").replace("-", ".").split("."))
+        except (ValueError, TypeError):
+            return (0,)
 
     @staticmethod
     def current_version() -> str:
@@ -108,8 +134,8 @@ class Updater:
     def check() -> dict[str, Any] | None:
         """Check GitHub for latest release. Returns {'version': tag, 'url': download_url} or None."""
         try:
-            import urllib.request
             import json
+            import urllib.request
             url: str = f"https://api.github.com/repos/{Updater.REPO}/releases/latest"
             req = urllib.request.Request(url, headers={"User-Agent": APP_NAME})
             with urllib.request.urlopen(req, timeout=5) as resp:
@@ -182,7 +208,13 @@ class App(ctk.CTk):
         except Exception:
             pass
 
-        self._water: WaterReminder = water_mgr or WaterReminder(lambda: self.cfg)
+        def _on_water_notify() -> None:
+            today = datetime.now().strftime("%Y-%m-%d")
+            if self.stats.get("agua_respondidas_fecha") != today:
+                self.stats["agua_respondidas_hoy"] = 0
+                self.stats["agua_respondidas_fecha"] = today
+            self.stats["agua_respondidas_hoy"] = self.stats.get("agua_respondidas_hoy", 0) + 1
+        self._water: WaterReminder = water_mgr or WaterReminder(lambda: self.cfg, on_notify=_on_water_notify)
 
         log.info(
             "App iniciada. running=%s, instalada=%s, primera_vez=%s",
@@ -197,7 +229,8 @@ class App(ctk.CTk):
             if reg_dir and os.path.normpath(app_dir) != os.path.normpath(reg_dir):
                 dest = os.path.join(reg_dir, os.path.basename(app_path))
                 if getattr(sys, "frozen", False) and dest != app_path:
-                    import shutil, subprocess
+                    import shutil
+                    import subprocess
                     try:
                         shutil.copy2(app_path, dest)
                         subprocess.Popen([dest])
@@ -226,18 +259,10 @@ class App(ctk.CTk):
 
     def _init_paths(self, app_dir: str) -> None:
         self._config_file, self._stats_file, self._hist_file = self._paths_from_dir(app_dir)
-        self._ejercicios_file: str = os.path.join(app_dir, "ejercicios.json")
         self._programs_dir: str = os.path.join(
             os.environ.get("LOCALAPPDATA", os.path.expanduser("~\\AppData\\Local")),
             APP_NAME,
         )
-        self._load_ejercicios()
-
-    def _load_ejercicios(self) -> None:
-        from pausa_activa.constants import load_ejercicios_from_file
-        ejercicios = load_ejercicios_from_file(self._ejercicios_file)
-        EJERCICIOS.clear()
-        EJERCICIOS.extend(ejercicios)
 
     def _check_update(self) -> None:
         try:
@@ -396,9 +421,10 @@ class App(ctk.CTk):
 
     def _check_achievements(self) -> None:
         shown = self.cfg.get("logros_mostrados", [])
-        new_achs = check_achievements(self.stats, self._cfg_mgr.load_stats(), shown)
+        new_achs = check_achievements(self.stats, self.stats, shown)
         if new_achs:
             self.cfg["logros_mostrados"] = shown
+            self._cfg_mgr.save_config(self.cfg)
             for ach in new_achs:
                 toast(_("logro_desbloqueado"), f"{ach['icon']} {_(ach['key'])}", kind="exito", duration=4000)
 
@@ -591,7 +617,6 @@ class App(ctk.CTk):
 
         # Partículas y efectos
         self._particles: list[dict] = []
-        self._sparkles: list[dict] = []
         self._confetti: list[dict] = []
         self._anim_frame = 0
         self._start_particle_animation()
@@ -765,12 +790,11 @@ class App(ctk.CTk):
         challenge_icon = "✅" if completed == challenge["id"] else "🎯"
         challenge_text = f"{challenge_icon} {challenge['title']}"
 
-        top: str = f"🎯 ¡Meta alcanzada!" if comp >= meta else f"{pct}% — {comp}/{meta}"
+        top: str = "🎯 ¡Meta alcanzada!" if comp >= meta else f"{pct}% — {comp}/{meta}"
         self.lbl_meta.configure(text=f"{top}  ·  {challenge_text}", text_color=comp_color)
         self._draw_week_chart()
 
     def _update_wellness_note(self) -> None:
-        from pausa_activa.constants import WELLNESS_NOTES
         note = random.choice(WELLNESS_NOTES)
         self._wellness_label.configure(text=f"{note['icon']} {note['title']}\n{note['msg']}")
 
@@ -878,8 +902,9 @@ class App(ctk.CTk):
                 return
 
             # Auto night mode check (cada 5 min)
-            if self.remaining % 300 == 0:
+            if self.remaining % 3600 == 0:
                 self._check_auto_night_mode()
+                self._save_weekly_snapshot()
 
             if self.cfg.get("fin_de_semana", False) and self._is_weekend():
                 self.lbl_st.configure(text=_("fin_semana"))
@@ -967,6 +992,7 @@ class App(ctk.CTk):
         self._total_sec = interval * 60
         self.remaining = self._total_sec
         self.stats["completadas"] += 1
+        self.stats["this_week_completadas"] = self.stats.get("this_week_completadas", 0) + 1
         now = datetime.now()
         self.stats["historial"].append({
             "fecha": now.strftime("%Y-%m-%d"),
@@ -1038,6 +1064,8 @@ class App(ctk.CTk):
 
     def _now(self) -> None:
         self.remaining = 0
+        if not self.running:
+            self._toggle()
 
     def _posponer(self) -> None:
         mins: int = self.cfg.get("posponer_min", 10)
@@ -1055,10 +1083,13 @@ class App(ctk.CTk):
         self.after(0, self._toggle)
 
     def _hotkey_show_hide(self) -> None:
+        self.after(0, self._toggle_visibility)
+
+    def _toggle_visibility(self) -> None:
         if self.winfo_viewable():
-            self.after(0, self._hide)
+            self._hide()
         else:
-            self.after(0, self._show)
+            self._show()
 
     def _hotkey_quit(self) -> None:
         self.after(0, self._quit)
@@ -1095,15 +1126,14 @@ class App(ctk.CTk):
                 )
 
     def _download_and_install(self, url: str) -> None:
-        import tempfile
         self.lbl_st.configure(text=_("descargando_update"))
         self._progress.configure(mode="indeterminate")
         self._progress.start()
         threading.Thread(target=self._do_download, args=(url,), daemon=True).start()
 
     def _do_download(self, url: str) -> None:
-        import urllib.request
         import tempfile
+        import urllib.request
         tmp_exe: str = ""
         try:
             tmp_dir: str = tempfile.gettempdir()
@@ -1158,7 +1188,7 @@ class App(ctk.CTk):
             f.write(")\n")
             f.write(f'copy /y "{new_exe}" "{current_exe}" >nul 2>&1\n')
             f.write(f'start "" "{current_exe}"\n')
-            f.write(f'del "%~f0"\n')
+            f.write('del "%~f0"\n')
         import subprocess
         subprocess.Popen(["cmd", "/c", bat], creationflags=0x08000000)
         self._water.stop()
@@ -1187,11 +1217,10 @@ class App(ctk.CTk):
             canvas.delete("sparkle")
             canvas.delete("confetti")
 
-            self._anim_frame += 1
+            self._anim_frame = (self._anim_frame + 1) % 10000
 
             # Partículas flotantes alrededor del reloj
             if self.running and not self.pausa_open and self.remaining > 0:
-                import math
                 num_particles = 6
                 for i in range(num_particles):
                     angle = (self._anim_frame * 0.02 + i * (2 * math.pi / num_particles))
@@ -1199,7 +1228,6 @@ class App(ctk.CTk):
                     px = cx + math.cos(angle) * dist
                     py = cy + math.sin(angle) * dist
                     size = 2 + math.sin(angle * 3 + self._anim_frame * 0.1) * 1.5
-                    alpha = 0.3 + math.sin(angle + self._anim_frame * 0.05) * 0.3
                     color = C.ACCENT if i % 2 == 0 else C.GREEN
                     canvas.create_oval(
                         px - size, py - size, px + size, py + size,
@@ -1244,7 +1272,10 @@ class App(ctk.CTk):
     def _spawn_confetti(self, count: int = 40) -> None:
         import random
         colors = [C.ACCENT, C.GREEN, C.YELLOW, "#EF4444", "#8B5CF6", "#EC4899"]
-        for _ in range(count):
+        cap = max(count, 80)
+        for __ in range(count):
+            if len(self._confetti) >= cap:
+                break
             self._confetti.append({
                 "x": random.uniform(30, 190),
                 "y": random.uniform(-20, 30),
@@ -1256,10 +1287,9 @@ class App(ctk.CTk):
             })
 
     def _spawn_sparkles(self, count: int = 8) -> None:
-        import random
         canvas = self._canvas
         cx, cy, r = 110, 110, 95
-        for _ in range(count):
+        for __ in range(count):
             angle = random.uniform(0, 2 * math.pi)
             dist = r + random.uniform(-10, 10)
             sx = cx + math.cos(angle) * dist
@@ -1285,9 +1315,9 @@ class App(ctk.CTk):
         return level, xp, xp_needed
 
     def _add_xp(self, amount: int) -> None:
-        old_level, _, _ = self._get_level()
+        old_level, old_xp, old_needed = self._get_level()
         self.stats["xp"] = self.stats.get("xp", 0) + amount
-        new_level, _, _ = self._get_level()
+        new_level, new_xp, new_needed = self._get_level()
         if new_level > old_level:
             self._spawn_confetti(30)
             toast("🎉 ¡Nivel aumentado!", f"¡Ahora eres nivel {new_level}!", kind="exito")
@@ -1304,12 +1334,11 @@ class App(ctk.CTk):
         {"id": "posture", "title": "🧘 Postura perfecta", "desc": "Activa el recordatorio de postura", "xp": 25},
         {"id": "hydration", "title": "💧 Hidratado", "desc": "Responde 3 recordatorios de agua", "xp": 35},
         {"id": "complete_all", "title": "🏆 Día completo", "desc": "Alcanza tu meta diaria de pausas", "xp": 100},
-        {"id": "night_owl", "title": "🦉 Búhu nocturno", "desc": "Completa una pausa después de las 8pm", "xp": 50},
+        {"id": "night_owl", "title": "🦉 Búho nocturno", "desc": "Completa una pausa después de las 8pm", "xp": 50},
     ]
 
     def _get_daily_challenge(self) -> dict:
-        import datetime
-        today = datetime.date.today().toordinal()
+        today = date.today().toordinal()
         idx = today % len(self.DAILY_CHALLENGES)
         return self.DAILY_CHALLENGES[idx]
 
@@ -1320,12 +1349,40 @@ class App(ctk.CTk):
             return
         cid = challenge["id"]
         success = False
+        now = datetime.now()
+        today_str = now.strftime("%Y-%m-%d")
         if cid == "early_bird":
-            success = self.stats.get("completadas", 0) > 0
-        elif cid == "complete_all":
-            success = self.stats.get("completadas", 0) >= self.cfg.get("meta_pausas", 6)
+            success = now.hour < 9 and self.stats.get("completadas", 0) > 0
+        elif cid == "double":
+            today_breaks = [
+                e for e in self.stats.get("historial", [])
+                if e.get("fecha") == today_str and e.get("estado") == "completada"
+            ]
+            for i, b1 in enumerate(today_breaks):
+                for b2 in today_breaks[i + 1:]:
+                    t1 = datetime.strptime(f"{b1['fecha']} {b1['hora']}", "%Y-%m-%d %H:%M")
+                    t2 = datetime.strptime(f"{b2['fecha']} {b2['hora']}", "%Y-%m-%d %H:%M")
+                    if abs((t1 - t2).total_seconds()) <= 3600:
+                        success = True
+                        break
+                if success:
+                    break
+        elif cid == "streak3":
+            success = self.stats.get("racha", 0) >= 3
+        elif cid == "all_exercises":
+            exercises_today = set()
+            for e in self.stats.get("historial", []):
+                if e.get("fecha") == today_str and e.get("estado") == "completada":
+                    exercises_today.add(e.get("ejercicio", ""))
+            success = len(exercises_today) >= 3
         elif cid == "posture":
             success = self.cfg.get("postura_recordatorio", False)
+        elif cid == "hydration":
+            success = self.stats.get("agua_respondidas_hoy", 0) >= 3
+        elif cid == "complete_all":
+            success = self.stats.get("completadas", 0) >= self.cfg.get("meta_pausas", 6)
+        elif cid == "night_owl":
+            success = now.hour >= 20
 
         if success:
             self.cfg["daily_challenge_completed"] = challenge["id"]
@@ -1363,17 +1420,18 @@ class App(ctk.CTk):
     # ════════════════════════════════════════════════════════════════════════
 
     def _get_weekly_comparison(self) -> tuple[int, int]:
-        import datetime
-        today = datetime.date.today()
-        this_week = self.stats.get("completadas", 0)
+        this_week = self.stats.get("this_week_completadas", 0)
         last_week = self.stats.get("last_week_completadas", 0)
         return this_week, last_week
 
     def _save_weekly_snapshot(self) -> None:
-        import datetime
-        today = datetime.date.today()
-        if today.weekday() == 0:  # Lunes
-            self.cfg["last_week_completadas"] = self.stats.get("completadas", 0)
+        today = date.today()
+        last_snap = self.stats.get("last_snapshot_date", "")
+        today_str = today.isoformat()
+        if today.weekday() == 0 and last_snap != today_str:
+            self.stats["last_week_completadas"] = self.stats.get("this_week_completadas", 0)
+            self.stats["this_week_completadas"] = 0
+            self.stats["last_snapshot_date"] = today_str
 
     # ════════════════════════════════════════════════════════════════════════
     # MODO MEDITACIÓN (respiración guiada)
@@ -1410,7 +1468,7 @@ class App(ctk.CTk):
                 self._meditation_phase = 0
                 self._meditation_cycle += 1
                 if self._meditation_cycle >= 5:
-                    self._meditation_active = false
+                    self._meditation_active = False
                     canvas.delete("meditation")
                     self.lbl_st.configure(text="Meditación completada 🧘")
                     return
@@ -1619,10 +1677,17 @@ class App(ctk.CTk):
             )
             if path:
                 import json
+                csv_history = ""
+                try:
+                    with open(self._hist_file, encoding="utf-8") as f:
+                        csv_history = f.read()
+                except Exception:
+                    pass
                 data = {
+                    "version": 2,
                     "stats": self.stats,
                     "config": {k: v for k, v in self.cfg.items() if not k.startswith("_")},
-                    "history": self._cfg_mgr.load_stats(),
+                    "historial_csv": csv_history,
                 }
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump(data, f, indent=2, ensure_ascii=False)
@@ -1639,7 +1704,7 @@ class App(ctk.CTk):
             )
             if path:
                 import json
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     data = json.load(f)
                 if "stats" in data:
                     self.stats.update(data["stats"])
@@ -1649,7 +1714,13 @@ class App(ctk.CTk):
                         if k in self.cfg:
                             self.cfg[k] = v
                     self._cfg_mgr.save_config(self.cfg)
-                if "history" in data:
+                if data.get("version") == 2 and data.get("historial_csv"):
+                    try:
+                        with open(self._hist_file, "w", encoding="utf-8", newline="") as f:
+                            f.write(data["historial_csv"])
+                    except Exception:
+                        pass
+                elif "history" in data:
                     self._cfg_mgr.save_stats(data["history"])
                 toast(_("toast_exito"), _("importar_ok"), kind="exito")
         except Exception as e:

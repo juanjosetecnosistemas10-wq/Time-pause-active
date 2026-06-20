@@ -1,9 +1,17 @@
 ; Inno Setup script for FlowBreak
 ; To compile: Run this file with Inno Setup Compiler (innosetup.com)
+;
+; MANUAL UPDATE PROCESS:
+; 1. Incrementa AppVersion abajo
+; 2. Build: pyinstaller FlowBreak.spec
+; 3. Compila este .iss con Inno Setup
+; 4. El setup nuevo reemplaza automaticamente la version anterior
+;    (Flags: ignoreversion se encarga de sobrescribir)
+; 5. Distribuye dist\FlowBreak_Setup.exe
 
 [Setup]
 AppName=FlowBreak
-AppVersion=2.0.0
+AppVersion=2.0.3
 AppPublisher=FlowBreak
 AppPublisherURL=https://github.com/tu_usuario/Time-pause-active
 AppSupportURL=https://github.com/tu_usuario/Time-pause-active

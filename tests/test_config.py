@@ -1,10 +1,11 @@
-import os
 import json
+import os
 import tempfile
+
 import pytest
 
 from pausa_activa.config import ConfigManager
-from pausa_activa.constants import DEFAULT_CONFIG, EJERCICIOS
+from pausa_activa.constants import EJERCICIOS
 
 
 @pytest.fixture

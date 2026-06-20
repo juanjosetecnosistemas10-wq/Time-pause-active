@@ -1,405 +1,13 @@
-"""Constantes del proyecto."""
-
 from __future__ import annotations
 
-import ctypes
-import ctypes.wintypes
-import logging
-import os
 import random
 from typing import Any
 
-
-def center_window(win: Any) -> None:
-    """Center window on the monitor containing the mouse pointer."""
-    win.update_idletasks()
-    w = win.winfo_width()
-    h = win.winfo_height()
-    if w < 100:
-        w = 400
-    if h < 100:
-        h = 500
-    try:
-        user32 = ctypes.windll.user32
-
-        class RECT(ctypes.Structure):
-            _fields_ = [
-                ("left", ctypes.c_long),
-                ("top", ctypes.c_long),
-                ("right", ctypes.c_long),
-                ("bottom", ctypes.c_long),
-            ]
-
-        class MONITORINFO(ctypes.Structure):
-            _fields_ = [
-                ("cbSize", ctypes.c_ulong),
-                ("rcMonitor", RECT),
-                ("rcWork", RECT),
-                ("dwFlags", ctypes.c_ulong),
-            ]
-
-        pt = ctypes.wintypes.POINT()
-        user32.GetCursorPos(ctypes.byref(pt))
-        monitor = user32.MonitorFromPoint(pt, 0x00000002)
-        info = MONITORINFO()
-        info.cbSize = ctypes.sizeof(MONITORINFO)
-        user32.GetMonitorInfoW(monitor, ctypes.byref(info))
-        mw = info.rcMonitor.right - info.rcMonitor.left
-        mh = info.rcMonitor.bottom - info.rcMonitor.top
-        x = info.rcMonitor.left + (mw - w) // 2
-        y = info.rcMonitor.top + (mh - h) // 2
-    except Exception:
-        sw = win.winfo_screenwidth()
-        sh = win.winfo_screenheight()
-        x = (sw - w) // 2
-        y = (sh - h) // 2
-    win.geometry(f"+{x}+{y}")
-
-
-APP_NAME: str = "FlowBreak"
-APP_DISPLAY: str = "FlowBreak"
-__version__: str = "2.0.3"
-UPDATER_REPO: str = "juanjosetecnosistemas10-wq/Time-pause-active"
-
-
-def darken_color(hex_color: str, amount: int = 30) -> str:
-    """Darken a hex color by the given amount."""
-    h = hex_color.lstrip("#")
-    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    return f"#{max(0, r - amount):02x}{max(0, g - amount):02x}{max(0, b - amount):02x}"
-
-INSTALL_DIR_REG: str = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\FlowBreak"
-
-# ── Temas ──────────────────────────────────────────────────────────────────
-
-THEMES: dict[str, dict[str, Any]] = {
-    "oscuro": {
-        "BG": "#0A0E1A",
-        "BG2": "#111827",
-        "BG3": "#1F2937",
-        "BG4": "#374151",
-        "ACCENT": "#3B82F6",
-        "ACCENT2": "#F43F5E",
-        "ACCENT3": "#8B5CF6",
-        "GREEN": "#10B981",
-        "YELLOW": "#F59E0B",
-        "TEXT": "#F9FAFB",
-        "TEXT_DIM": "#9CA3AF",
-        "TEXT_MUTED": "#6B7280",
-        "BORDER": "#1E293B",
-        "AGUA": "#06B6D4",
-        "CARD": "#111827",
-        "CARD_BORDER": "#1E293B",
-        "SUCCESS_BG": "#064E3B",
-        "WARNING_BG": "#422006",
-        "ERROR_BG": "#450A0A",
-        "TRAY_ACTIVE": (59, 130, 246),
-        "TRAY_PAUSED": (156, 163, 175),
-        "TRAY_OFF": (244, 63, 94),
-        "GLOW": "#3B82F6",
-        "SURFACE": "#0F172A",
-    },
-    "claro": {
-        "BG": "#F8FAFC",
-        "BG2": "#FFFFFF",
-        "BG3": "#F1F5F9",
-        "BG4": "#E2E8F0",
-        "ACCENT": "#2563EB",
-        "ACCENT2": "#E11D48",
-        "ACCENT3": "#7C3AED",
-        "GREEN": "#059669",
-        "YELLOW": "#D97706",
-        "TEXT": "#0F172A",
-        "TEXT_DIM": "#64748B",
-        "TEXT_MUTED": "#94A3B8",
-        "BORDER": "#E2E8F0",
-        "AGUA": "#0891B2",
-        "CARD": "#FFFFFF",
-        "CARD_BORDER": "#E2E8F0",
-        "SUCCESS_BG": "#DCFCE7",
-        "WARNING_BG": "#FEF3C7",
-        "ERROR_BG": "#FEE2E2",
-        "TRAY_ACTIVE": (37, 99, 235),
-        "TRAY_PAUSED": (100, 116, 139),
-        "TRAY_OFF": (225, 29, 72),
-        "GLOW": "#2563EB",
-        "SURFACE": "#FFFFFF",
-    },
-}
-
-# ── Paletas de acento ──────────────────────────────────────────────────────
-
-ACCENT_PALETTES: dict[str, dict[str, Any]] = {
-    "azul":    {"ACCENT": "#3B82F6", "TRAY_ACTIVE": (59, 130, 246), "GLOW": "#3B82F6"},
-    "verde":   {"ACCENT": "#10B981", "TRAY_ACTIVE": (16, 185, 129), "GLOW": "#10B981"},
-    "morado":  {"ACCENT": "#8B5CF6", "TRAY_ACTIVE": (139, 92, 246), "GLOW": "#8B5CF6"},
-    "rosa":    {"ACCENT": "#EC4899", "TRAY_ACTIVE": (236, 72, 153), "GLOW": "#EC4899"},
-    "naranja": {"ACCENT": "#F97316", "TRAY_ACTIVE": (249, 115, 22), "GLOW": "#F97316"},
-    "teal":    {"ACCENT": "#14B8A6", "TRAY_ACTIVE": (20, 184, 166), "GLOW": "#14B8A6"},
-    "rojo":    {"ACCENT": "#EF4444", "TRAY_ACTIVE": (239, 68, 68), "GLOW": "#EF4444"},
-}
-
-# ── Paletas de fondo ───────────────────────────────────────────────────────
-
-FONDO_PALETTES: dict[str, dict[str, str]] = {
-    "estandar":   {},
-    "profundo":   {"BG": "#030712", "BG2": "#0A0E1A", "BG3": "#1F2937", "CARD": "#111827",
-                   "TEXT": "#F9FAFB", "TEXT_DIM": "#9CA3AF", "TEXT_MUTED": "#6B7280",
-                   "SURFACE": "#0A0E1A"},
-    "gris":       {"BG": "#111318", "BG2": "#1C1F26", "BG3": "#2D3139", "CARD": "#1C1F26",
-                   "TEXT": "#F9FAFB", "TEXT_DIM": "#9CA3AF", "TEXT_MUTED": "#6B7280",
-                   "SURFACE": "#111318"},
-    "azulado":    {"BG": "#0B1120", "BG2": "#111827", "BG3": "#1E293B", "CARD": "#111827",
-                   "TEXT": "#F9FAFB", "TEXT_DIM": "#9CA3AF", "TEXT_MUTED": "#6B7280",
-                   "SURFACE": "#0B1120"},
-    "blanco":     {"BG": "#FFFFFF", "BG2": "#F8FAFC", "BG3": "#F1F5F9", "CARD": "#FFFFFF",
-                   "TEXT": "#0F172A", "TEXT_DIM": "#64748B", "TEXT_MUTED": "#94A3B8",
-                   "SURFACE": "#FFFFFF"},
-    "gris_suave": {"BG": "#F1F5F9", "BG2": "#FFFFFF", "BG3": "#E2E8F0", "CARD": "#FFFFFF",
-                   "TEXT": "#0F172A", "TEXT_DIM": "#64748B", "TEXT_MUTED": "#94A3B8",
-                   "SURFACE": "#F1F5F9"},
-    "calido":     {"BG": "#FFFBEB", "BG2": "#FFFFFF", "BG3": "#FEF3C7", "CARD": "#FFFFFF",
-                   "TEXT": "#0F172A", "TEXT_DIM": "#64748B", "TEXT_MUTED": "#94A3B8",
-                   "SURFACE": "#FFFBEB"},
-}
-
-_tema_actual: str = "oscuro"
-
-
-class _Colors:
-    """Mutable color container — references stay valid when theme changes."""
-
-    def load(self, nombre: str) -> None:
-        t = THEMES.get(nombre, THEMES["oscuro"])
-        for k, v in t.items():
-            setattr(self, k, v)
-
-
-C = _Colors()
-C.load("oscuro")
-
-
-def set_theme(nombre: str, acento: str = "azul", fondo: str = "estandar") -> None:
-    global _tema_actual
-    if nombre not in THEMES:
-        return
-    _tema_actual = nombre
-    C.load(nombre)
-    paleta = ACCENT_PALETTES.get(acento, ACCENT_PALETTES["azul"])
-    for k, v in paleta.items():
-        setattr(C, k, v)
-    fondos = FONDO_PALETTES.get(fondo, {})
-    for k, v in fondos.items():
-        setattr(C, k, v)
-    try:
-        import customtkinter as ctk
-        if nombre == "oscuro":
-            ctk.set_appearance_mode("dark")
-        elif nombre == "claro":
-            ctk.set_appearance_mode("light")
-        else:
-            try:
-                import darkdetect
-                ctk.set_appearance_mode("dark" if darkdetect.theme() == "Dark" else "light")
-            except (ImportError, Exception):
-                ctk.set_appearance_mode("dark")
-    except ImportError:
-        pass
-
-
-def get_theme() -> str:
-    return _tema_actual
-
-
-# ── Logging ────────────────────────────────────────────────────────────────
-
-LOG_DIR: str = os.path.join(
-    os.environ.get("LOCALAPPDATA", os.path.expanduser("~\\AppData\\Local")),
-    APP_NAME,
-    "logs",
-)
-os.makedirs(LOG_DIR, exist_ok=True)
-
-_log_initialized: bool = False
-
-
-def _ensure_logging() -> None:
-    global _log_initialized
-    if _log_initialized:
-        return
-    _log_initialized = True
-
-    _file_handler = logging.FileHandler(
-        os.path.join(LOG_DIR, "flowbreak.log"),
-        encoding="utf-8",
-    )
-    _file_handler.setLevel(logging.DEBUG)
-    _file_handler.setFormatter(logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    ))
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        datefmt="%H:%M:%S",
-        handlers=[
-            logging.StreamHandler(),
-            _file_handler,
-        ],
-    )
-
-
-log = logging.getLogger("FlowBreak")
-_ensure_logging()
-
-# ── Config por defecto ─────────────────────────────────────────────────────
-
-# ── Font scaling ──────────────────────────────────────────────────────────
-
-FONT_MULTIPLIERS: dict[str, float] = {
-    "pequeno": 0.85,
-    "normal": 1.0,
-    "grande": 1.15,
-    "muy_grande": 1.3,
-}
-
-_font_mult: float = 1.0
-
-
-def set_font_size(key: str) -> None:
-    global _font_mult
-    _font_mult = FONT_MULTIPLIERS.get(key, 1.0)
-
-
-def F(size: int, weight: str = "") -> tuple:
-    """Return a Segoe UI font tuple scaled by the current multiplier."""
-    scaled = max(1, int(size * _font_mult))
-    if weight:
-        return ("Segoe UI", scaled, weight)
-    return ("Segoe UI", scaled)
-
-
-DEFAULT_CONFIG: dict[str, Any] = {
-    "intervalo_min": 45,
-    "duracion_pausa_min": 5,
-    "hora_inicio": "08:00",
-    "hora_fin": "18:00",
-    "ejercicios_activos": [],
-    "sonido": True,
-    "posponer_min": 10,
-    "autoarranque": False,
-    "meta_pausas": 6,
-    "no_molestar": True,
-    "agua_activo": True,
-    "agua_min": 30,
-    "fin_de_semana": False,
-    "sonido_ambiente": "ninguno",
-    "primera_vez": True,
-    "tema": "oscuro",
-    "modo": "normal",
-    "perfil": "default",
-    "idioma": "es",
-    "notificacion_sonido": "default",
-    "notificacion_duracion": "short",
-    "tamano_letra": "normal",
-    "color_acento": "azul",
-    "fondo": "estandar",
-    "hotkeys_enabled": True,
-    "pantalla_completa": False,
-    "guia_voz": True,
-    "tts_activo": False,
-    "sonidos_personalizados": False,
-    # ── Nuevas features ──
-    "postura_recordatorio": False,
-    "postura_intervalo_min": 20,
-    "pomodoro_trabajo_min": 25,
-    "pomodoro_descanso_corto_min": 5,
-    "pomodoro_descanso_largo_min": 15,
-    "pomodoro_rondas_largas": 4,
-    "compacto_enabled": False,
-    "floating_enabled": False,
-    "floating_opacity": 85,
-    "workouts": [],
-    "workout_ultimo": None,
-    "logros_mostrados": [],
-    "hotkey_siguiente": "ctrl+right",
-    "hotkey_anterior": "ctrl+left",
-    "hotkey_pausar": "ctrl+space",
-    "hotkey_saltar": "ctrl+escape",
-    "color_personalizado_primary": "",
-    "color_personalizado_accent": "",
-    "sound_packs": ["default"],
-    "sound_pack_activo": "default",
-    "tutorial_paso": 0,
-    "tutorial_completado": False,
-    "fullscreen_tema": "oscuro",
-}
-
-# ── Ejercicios ─────────────────────────────────────────────────────────────
-
-EJERCICIOS_BUILTIN: list[dict[str, Any]] = [
-    {"id": "cuello",  "nombre": "Estiramiento de cuello",  "icono": "🧘", "instrucciones": "Libera la tensión del cuello y hombros acumulada por la pantalla.", "pasos": ["Inclina la cabeza a la derecha llevando la oreja al hombro 15 seg", "Inclina la cabeza a la izquierda llevando la oreja al hombro 15 seg", "Gira el cuello suavemente a la derecha y a la izquierda 5 veces cada lado"]},
-    {"id": "hombros", "nombre": "Estiramiento de hombros", "icono": "💪", "instrucciones": "Afloja los hombros rígidos por la mala postura frente al ordenador.", "pasos": ["Sube los hombros hasta las orejas aguantando 3 seg y suelta 10 veces", "Rota los hombros hacia atrás en círculos amplios 10 veces", "Rota los hombros hacia adelante en círculos amplios 10 veces"]},
-    {"id": "espalda", "nombre": "Estiramiento de espalda", "icono": "🏃", "instrucciones": "Estira la espalda para contrarrestar horas de estar sentado.", "pasos": ["Entrelaza las manos y estíralas hacia arriba con palmas al techo 15 seg", "Inclínate hacia adelante desde la cadera tocando los pies 15 seg", "Gira el tronco a la derecha y a la izquierda con manos en la cadera 5 veces"]},
-    {"id": "visual",  "nombre": "Descanso visual",         "icono": "👁️", "instrucciones": "Descansa tus ojos del brillo de la pantalla. Sigue la regla 20-20-20.", "pasos": ["Mira un objeto lejano a 6+ metros por 20 segundos", "Cierra los ojos y cúbrelos con las palmas sin presionar 15 seg", "Parpadea rápidamente 10 veces y haz círculos con los ojos 5 por lado"]},
-    {"id": "manos",   "nombre": "Ejercicio de manos y muñecas", "icono": "✋", "instrucciones": "Previene lesiones por escritura y uso del ratón.", "pasos": ["Extiende el brazo con palma arriba y empuja los dedos hacia abajo 12 seg cada mano", "Abre y cierra los puños extendiendo bien los dedos 10 veces", "Gira las muñecas en círculos 5 veces por lado"]},
-    {"id": "sentad",  "nombre": "Sentadillas y piernas",     "icono": "🏋️", "instrucciones": "Activa piernas y glúteos para mejorar la circulación.", "pasos": ["Levántate de la silla y baja en sentadilla hasta 90° con espalda recta 8 veces", "Eleva talones quedándote de puntillas 15 veces", "Eleva rodillas alternando como marchando en el sitio 20 veces"]},
-    {"id": "respira", "nombre": "Respiración profunda",      "icono": "🌬️", "instrucciones": "Oxigena tu cuerpo y relaja la mente con respiración consciente.", "pasos": ["Inhala profundamente por la nariz contando 4 seg", "Retén el aire contando 4 seg", "Exhala lentamente por la boca contando 6 seg. Repite 5 veces"]},
-    {"id": "caminar", "nombre": "Caminata activa en el sitio", "icono": "🚶", "instrucciones": "Activa la circulación caminando sin moverte del sitio.", "pasos": ["Marcha levantando las rodillas a la altura de la cadera 30 seg", "Balancea los brazos coordinados al caminar 30 seg", "Haz talones a los glúteos alternando piernas 30 seg"]},
-    {"id": "postura", "nombre": "Corrección de postura",     "icono": "🧍", "instrucciones": "Corrige la postura encorvada y fortalece la espalda alta.", "pasos": ["Párate derecho llevando hombros atrás y abajo, pecho abierto 15 seg", "Lleva los brazos en forma de W apretando omóplatos 12 veces", "Mantén la postura correcta respirando profundo 20 seg"]},
-    {"id": "cadera",  "nombre": "Movilidad de cadera",       "icono": "🔄", "instrucciones": "Afloja las caderas y la zona lumbar tras estar sentado.", "pasos": ["De pie, apoya manos en caderas y haz círculos amplios a la derecha 20 seg", "Repite círculos hacia la izquierda 20 seg", "Empuja la cadera adelante y atrás balanceando 10 veces"]},
-    {"id": "tobillos","nombre": "Movilidad de tobillos",     "icono": "🦶", "instrucciones": "Mejora la circulación de piernas y previene pies hinchados.", "pasos": ["Eleva un pie y rota el tobillo en círculos derecha 15 seg", "Rota el mismo tobillo a la izquierda 15 seg", "Cambia de pie y repite rotaciones 30 seg total"]},
-    {"id": "yoga",    "nombre": "Estiramiento de yoga silla", "icono": "🧎", "instrucciones": "Estira la espalda y relaja la mente con esta postura.", "pasos": ["Siéntate erguido al borde de la silla, estira brazos arriba 15 seg", "Inclínate hacia adelante dejando caer brazos y cabeza 15 seg", "Gira el tronco hacia la derecha y agarra el respaldo 10 seg cada lado"]},
-]
-
-EJERCICIOS: list[dict[str, Any]] = list(EJERCICIOS_BUILTIN)
-
-
-def load_ejercicios_from_file(filepath: str = "") -> list[dict[str, Any]]:
-    """Load exercises from a JSON file, or return built-in exercises.
-
-    The file-based override is deprecated — ejercicios.json is kept only
-    as a reference. Always returns EJERCICIOS_BUILTIN.
-    """
-    return list(EJERCICIOS_BUILTIN)
-
-
-# ── Notas de bienestar ──────────────────────────────────────────────────────
-
-WELLNESS_NOTES: list[dict[str, str]] = [
-    {"icon": "🧘", "title": "Respira profundo", "msg": "Inhala 4 seg, sostén 4 seg, exhala 6 seg. Repite 3 veces."},
-    {"icon": "💧", "title": "Hidrátate", "msg": "Tómate un vaso de agua. Tu cuerpo te lo agradecerá."},
-    {"icon": "👀", "title": "Descansa la vista", "msg": "Mira algo lejano a 6 metros por 20 segundos."},
-    {"icon": "🧍", "title": "Corrige tu postura", "msg": "Espalda recta, hombros relajados, pies en el suelo."},
-    {"icon": "🌞", "title": "Busca luz natural", "msg": "Si buscas una ventana. La luz natural mejora tu ánimo."},
-    {"icon": "🧠", "title": "Limpia tu mente", "msg": "Cierra los ojos 30 segundos y piensa en algo que te haga feliz."},
-    {"icon": "💪", "title": "Estira tu cuerpo", "msg": "Estira los brazos arriba y mantén 10 segundos."},
-    {"icon": "😊", "title": "Sonríe", "msg": "Una sonrisa libera endorfinas. ¡Hazlo ahora!"},
-    {"icon": "🪑", "title": "Levántate", "msg": "Si llevas más de 30 min sentado, párate y camina un momento."},
-    {"icon": "🎶", "title": "Escucha música", "msg": "Pon una canción que te guste y disfruta el momento."},
-    {"icon": "🌿", "title": "Conecta con la naturaleza", "msg": "Mira por la ventana o sal un momento al exterior."},
-    {"icon": "🫁", "title": "Oxigena tu cerebro", "msg": "5 respiraciones profundas aumentan tu concentración."},
-    {"icon": "💆", "title": "Relaja el cuello", "msg": "Inclina la cabeza suavemente a cada lado, 10 seg por lado."},
-    {"icon": "☕", "title": "Pausa consciente", "msg": "Si tomas café, disfrútalo sin mirar la pantalla."},
-    {"icon": "🙏", "title": "Agradece", "msg": "Piensa en 3 cosas buenas que te pasaron hoy."},
-    {"icon": "💪", "title": "Activa piernas", "msg": "Haz 10 sentadillas suaves para activar la circulación."},
-    {"icon": "🎵", "title": "Canta", "msg": "Canta tu canción favorita. Libera tensión y mejora el ánimo."},
-    {"icon": "🤗", "title": "Abrázate", "msg": "Un abrazo a ti mismo reduce el estrés. Hazlo ahora."},
-    {"icon": "🌺", "title": "Aromaterapia", "msg": "Si tienes aceite esencial, aplícalo en las muñecas."},
-    {"icon": "😴", "title": "Poder del sueño", "msg": "Dormir 7-8 horas mejora tu productividad un 30%."},
-]
-
-
-# ── i18n ───────────────────────────────────────────────────────────────────
-
 I18N: dict[str, dict[str, Any]] = {
     "es": {
-        # Identidad
         "app_name": "FlowBreak",
         "flowbreak": "FlowBreak",
         "pausa_activa": "PAUSA ACTIVA",
-        # Temporizador
         "break_now": "Pausa ya",
         "pausa_ya": "Pausa ya",
         "reanudar": "Reanudar",
@@ -417,14 +25,12 @@ I18N: dict[str, dict[str, Any]] = {
         "btn_reanudar": "▶ Reanudar",
         "pausa_pospuesta": "Pausa pospuesta {mins} min",
         "prox_pausa": "Próxima pausa en {t}",
-        # Tray menu
         "abrir": "Abrir",
         "pausa_ya_tray": "Pausa ya",
         "posponer_tray": "Posponer",
         "pausar_tray": "Pausar/Reanudar",
         "buscar_actualizaciones": "Buscar actualizaciones",
         "salir": "Salir",
-        # Hotkeys
         "hotkey_break_now": "Pausa ya (Ctrl+Alt+B)",
         "hotkey_snooze": "Posponer (Ctrl+Alt+S)",
         "hotkey_pause_resume": "Pausar/Reanudar (Ctrl+Alt+P)",
@@ -432,21 +38,18 @@ I18N: dict[str, dict[str, Any]] = {
         "hotkey_quit": "Salir (Ctrl+Alt+Q)",
         "section_hotkeys": "Atajos globales",
         "hotkeys_enabled": "Activar atajos globales",
-        # Badges
         "badge_activo": "ACTIVO",
         "badge_pausado": "PAUSADO",
         "badge_fin_semana": "FIN DE SEMANA",
         "badge_fuera_horario": "FUERA DE HORARIO",
         "badge_no_molestar": "NO MOLESTAR",
         "pospuesto_fullscreen": "Pausa pospuesta (pantalla completa detectada)",
-        # Configuración
         "settings": "Configuración",
         "configuracion": "Configuración",
         "save": "Guardar",
         "guardar": "Guardar",
         "cancel": "Cancelar",
         "cancelar": "Cancelar",
-        # Installer
         "install_title": "Instalar FlowBreak",
         "install_desc": "Configura la instalación y haz clic en Instalar.",
         "install_folder_label": "Carpeta de instalación:",
@@ -474,7 +77,6 @@ I18N: dict[str, dict[str, Any]] = {
         "instalar": "Instalar",
         "uninstall": "Desinstalar",
         "desinstalar": "Desinstalar",
-        # Estadísticas
         "statistics": "Estadísticas",
         "estadisticas": "Estadísticas de hoy",
         "weekly_chart": "Últimos 7 días",
@@ -482,7 +84,6 @@ I18N: dict[str, dict[str, Any]] = {
         "exportar_csv": "Exportar CSV",
         "close": "Cerrar",
         "cerrar": "Cerrar",
-        # Metas / notificaciones
         "goal_achieved": "¡Meta cumplida!",
         "meta_cumplida": "¡Meta cumplida!",
         "water_reminder": "¡Recuerda tomar agua!",
@@ -507,7 +108,6 @@ I18N: dict[str, dict[str, Any]] = {
         "lluvia": "Lluvia",
         "nature": "Naturaleza",
         "naturaleza": "Naturaleza",
-        # Tabs
         "tab_timer": "⏱ Temporizador",
         "config_temporizador": "⏱ Temporizador",
         "tab_options": "⚙ Opciones",
@@ -516,22 +116,18 @@ I18N: dict[str, dict[str, Any]] = {
         "config_sonido": "🔊 Sonido",
         "tab_exercises": "🏃 Ejercicios",
         "config_ejercicios": "🏃 Ejercicios",
-        # Modos
         "mode_normal": "Normal",
         "modo_normal": "Normal",
         "mode_pomodoro": "Pomodoro",
         "modo_pomodoro": "Pomodoro",
         "modo_personalizado": "Personalizado",
-        # Idioma / tema
         "language": "Idioma",
         "theme": "Tema",
         "dark": "Oscuro",
         "light": "Claro",
-        # Varios
         "profile": "Perfil",
         "about": "Acerca de",
         "bienvenido": "¡Bienvenido a FlowBreak!",
-        # ConfigWindow fields
         "field_intervalo": "Intervalo entre pausas (min)",
         "field_duracion_pausa": "Duración de la pausa (min)",
         "field_hora_inicio": "Hora inicio (HH:MM)",
@@ -575,7 +171,6 @@ I18N: dict[str, dict[str, Any]] = {
         "fondo_blanco": "Blanco",
         "fondo_gris_suave": "Gris suave",
         "fondo_calido": "Cálido",
-        # StatsWindow
         "stats_completadas": "Pausas completadas",
         "stats_saltadas": "Pausas saltadas",
         "stats_tasa_exito": "Tasa de éxito",
@@ -585,7 +180,6 @@ I18N: dict[str, dict[str, Any]] = {
         "stats_en_progreso": "En progreso",
         "ultimos_7_dias": "Últimos 7 días",
         "ultimas_pausas": "Últimas pausas",
-        # Welcome window
         "welcome_title": "Bienvenido a FlowBreak",
         "welcome_heading": "👋  Bienvenido",
         "welcome_card1_title": "Recordatorios automáticos",
@@ -619,7 +213,6 @@ I18N: dict[str, dict[str, Any]] = {
         "to": "a",
         "welcome_start": "¡Empezar! 🚀",
         "err_hora_inicio": "Hora inicio inválida",
-        # Error messages
         "err_valores_positivos": "Todos los valores deben ser positivos",
         "err_hora_invalida": "Hora inválida",
         "err_hora_fin": "Hora fin debe ser mayor que hora inicio",
@@ -653,7 +246,6 @@ I18N: dict[str, dict[str, Any]] = {
         "exportado_ok": "Datos exportados a:\n{path}",
         "exportado_error": "No se pudo exportar:\n{e}",
         "todos": "Todos",
-        # Uninstall
         "uninstall_title": "Desinstalar FlowBreak",
         "uninstall_heading": "Desinstalar",
         "uninstall_warning": "Esta acción eliminará la configuración de la app y no puede deshacerse.",
@@ -671,13 +263,11 @@ I18N: dict[str, dict[str, Any]] = {
         "uninstall_warn_msg": "Se completó con algunos errores:\n\n",
         "uninstall_ok_title": "Desinstalación completa",
         "uninstall_ok_msg": "FlowBreak ha sido desinstalado correctamente.",
-        # Tamaño de letra
         "section_font_size": "Tamaño de letra",
         "font_pequeno": "Pequeño",
         "font_normal": "Normal",
         "font_grande": "Grande",
         "font_muy_grande": "Muy grande",
-        # BreakWindow immersive / summary
         "break_fullscreen": "Pantalla completa",
         "break_voice": "Guía por voz",
         "break_summary_title": "Pausa completada",
@@ -688,7 +278,6 @@ I18N: dict[str, dict[str, Any]] = {
         "comenzar": "Comenzar",
         "break_congrats_title": "¡Muy bien!",
         "break_congrats_desc": "Completaste tu pausa activa. Tu cuerpo te lo agradece.",
-        # Frases motivacionales
         "frases": [
             "¡Excelente! Tu cuerpo te lo agradece.",
             "Cada pausa es una inversión en tu salud.",
@@ -701,11 +290,8 @@ I18N: dict[str, dict[str, Any]] = {
             "¡Meta del día cumplida! Gran trabajo.",
             "Descansar es parte del éxito.",
         ],
-        # ── Nuevas features ──
-        # Postura
         "postura_recordatorio": "Recordatorio de postura",
         "postura_intervalo": "Cada cuántos minutos (postura):",
-        # Pomodoro
         "pomodoro_trabajo": "Trabajo (min)",
         "pomodoro_descanso_corto": "Descanso corto (min)",
         "pomodoro_descanso_largo": "Descanso largo (min)",
@@ -713,14 +299,11 @@ I18N: dict[str, dict[str, Any]] = {
         "pomodoro_sesion_trabajo": "Sesión de trabajo",
         "pomodoro_sesion_descanso": "Descanso",
         "pomodoro_sesion_largo": "Descanso largo",
-        # Compacto
         "modo_compacto": "Modo compacto",
         "compacto_desc": "Mini ventana con timer y controles básicos",
-        # Floating
         "floating_timer": "Timer flotante",
         "floating_desc": "Mini timer siempre visible en escritorio",
         "floating_opacidad": "Opacidad del timer flotante",
-        # Workout
         "workout": "Rutina de ejercicio",
         "workouts": "Mis rutinas",
         "workout_crear": "Crear rutina",
@@ -730,7 +313,6 @@ I18N: dict[str, dict[str, Any]] = {
         "workout_guardar": "Guardar rutina",
         "workout_ejecutar": "Iniciar rutina",
         "workout_vacia": "No hay rutinas creadas",
-        # Logros
         "logros": "Logros",
         "logro_primera_pausa": "Primera pausa completada",
         "logro_5_pausas": "5 pausas en un día",
@@ -743,24 +325,20 @@ I18N: dict[str, dict[str, Any]] = {
         "logro_night_owl": "Pausa después de las 8pm",
         "logro_water_10": "10 recordatorios de agua",
         "logro_desbloqueado": "¡Logro desbloqueado!",
-        # Exportar/Importar
         "importar_stats": "Importar estadísticas",
         "exportar_ok": "Estadísticas exportadas a:\n{path}",
         "importar_ok": "Estadísticas importadas correctamente",
         "importar_error": "Error al importar: {error}",
-        # Hotkeys personalizables
         "section_hotkeys_custom": "Atajos de teclado",
         "hotkey_siguiente": "Siguiente paso/ejercicio",
         "hotkey_anterior": "Paso/ejercicio anterior",
         "hotkey_pausar": "Pausar/reanudar timer",
         "hotkey_saltar": "Saltar pausa",
-        # Sonido
         "sound_packs": "Paquetes de sonido",
         "sound_pack_default": "Por defecto",
         "sound_pack_nature": "Naturaleza",
         "sound_pack_minimal": "Minimalista",
         "sound_pack_activo": "Paquete activo",
-        # Tutorial
         "tutorial_paso1_titulo": "Paso 1: Configura tus pausas",
         "tutorial_paso1_desc": "Establece cada cuánto tiempo quieres hacer una pausa activa.",
         "tutorial_paso2_titulo": "Paso 2: Elige ejercicios",
@@ -781,21 +359,17 @@ I18N: dict[str, dict[str, Any]] = {
         "tutorial_feat_logros_desc": "Desbloquea logros por ser constante",
         "tutorial_feat_stats": "Estadísticas",
         "tutorial_feat_stats_desc": "Revisa tu progreso diario",
-        # Fullscreen
         "fullscreen_timer": "Modo pantalla completa",
         "fullscreen_desc": "Timer grande a pantalla completa para presentaciones",
         "fullscreen_salir": "Salir de pantalla completa (Esc)",
-        # Toast
         "toast_info": "Información",
         "toast_exito": "Éxito",
         "toast_advertencia": "Advertencia",
     },
     "en": {
-        # Identity
         "app_name": "FlowBreak",
         "flowbreak": "FlowBreak",
         "pausa_activa": "ACTIVE BREAK",
-        # Timer
         "break_now": "Break now",
         "pausa_ya": "Break now",
         "reanudar": "Resume",
@@ -813,14 +387,12 @@ I18N: dict[str, dict[str, Any]] = {
         "btn_reanudar": "▶ Resume",
         "pausa_pospuesta": "Break snoozed {mins} min",
         "prox_pausa": "Next break in {t}",
-        # Tray menu
         "abrir": "Open",
         "pausa_ya_tray": "Break now",
         "posponer_tray": "Snooze",
         "pausar_tray": "Pause/Resume",
         "buscar_actualizaciones": "Check for updates",
         "salir": "Exit",
-        # Hotkeys
         "hotkey_break_now": "Break now (Ctrl+Alt+B)",
         "hotkey_snooze": "Snooze (Ctrl+Alt+S)",
         "hotkey_pause_resume": "Pause/Resume (Ctrl+Alt+P)",
@@ -828,14 +400,12 @@ I18N: dict[str, dict[str, Any]] = {
         "hotkey_quit": "Exit (Ctrl+Alt+Q)",
         "section_hotkeys": "Global Hotkeys",
         "hotkeys_enabled": "Enable global hotkeys",
-        # Badges
         "badge_activo": "ACTIVE",
         "badge_pausado": "PAUSED",
         "badge_fin_semana": "WEEKEND",
         "badge_fuera_horario": "OUTSIDE HOURS",
         "badge_no_molestar": "DO NOT DISTURB",
         "pospuesto_fullscreen": "Break postponed (fullscreen detected)",
-        # Settings
         "settings": "Settings",
         "configuracion": "Settings",
         "save": "Save",
@@ -846,7 +416,6 @@ I18N: dict[str, dict[str, Any]] = {
         "instalar": "Install",
         "uninstall": "Uninstall",
         "desinstalar": "Uninstall",
-        # Installer
         "install_title": "Install FlowBreak",
         "install_desc": "Configure the installation and click Install.",
         "install_folder_label": "Installation folder:",
@@ -871,7 +440,6 @@ I18N: dict[str, dict[str, Any]] = {
         "install_ok_msg": "FlowBreak installed in:\n{dir}",
         "install_perm_error_title": "Permission error",
         "install_perm_error_msg": "Could not write to:\n{dir}\n\nTry running as Administrator.",
-        # Statistics
         "statistics": "Statistics",
         "estadisticas": "Today's statistics",
         "weekly_chart": "Last 7 days",
@@ -879,7 +447,6 @@ I18N: dict[str, dict[str, Any]] = {
         "exportar_csv": "Export CSV",
         "close": "Close",
         "cerrar": "Close",
-        # Goals / notifications
         "goal_achieved": "Goal achieved!",
         "meta_cumplida": "Goal achieved!",
         "water_reminder": "Remember to drink water!",
@@ -904,7 +471,6 @@ I18N: dict[str, dict[str, Any]] = {
         "lluvia": "Rain",
         "nature": "Nature",
         "naturaleza": "Nature",
-        # Tabs
         "tab_timer": "⏱ Timer",
         "config_temporizador": "⏱ Timer",
         "tab_options": "⚙ Options",
@@ -913,22 +479,18 @@ I18N: dict[str, dict[str, Any]] = {
         "config_sonido": "🔊 Sound",
         "tab_exercises": "🏃 Exercises",
         "config_ejercicios": "🏃 Exercises",
-        # Modes
         "mode_normal": "Normal",
         "modo_normal": "Normal",
         "mode_pomodoro": "Pomodoro",
         "modo_pomodoro": "Pomodoro",
         "modo_personalizado": "Custom",
-        # Language / theme
         "language": "Language",
         "theme": "Theme",
         "dark": "Dark",
         "light": "Light",
-        # Misc
         "profile": "Profile",
         "about": "About",
         "bienvenido": "Welcome to FlowBreak!",
-        # ConfigWindow fields
         "field_intervalo": "Interval between breaks (min)",
         "field_duracion_pausa": "Break duration (min)",
         "field_hora_inicio": "Start time (HH:MM)",
@@ -972,7 +534,6 @@ I18N: dict[str, dict[str, Any]] = {
         "fondo_blanco": "White",
         "fondo_gris_suave": "Soft gray",
         "fondo_calido": "Warm",
-        # StatsWindow
         "stats_completadas": "Completed breaks",
         "stats_saltadas": "Skipped breaks",
         "stats_tasa_exito": "Success rate",
@@ -982,7 +543,6 @@ I18N: dict[str, dict[str, Any]] = {
         "stats_en_progreso": "In progress",
         "ultimos_7_dias": "Last 7 days",
         "ultimas_pausas": "Recent breaks",
-        # Welcome window
         "welcome_title": "Welcome to FlowBreak",
         "welcome_heading": "👋  Welcome",
         "welcome_card1_title": "Automatic reminders",
@@ -1016,7 +576,6 @@ I18N: dict[str, dict[str, Any]] = {
         "to": "to",
         "welcome_start": "Let's start! 🚀",
         "err_hora_inicio": "Invalid start time",
-        # Error messages
         "err_valores_positivos": "All values must be positive",
         "err_hora_invalida": "Invalid time",
         "err_hora_fin": "End time must be after start time",
@@ -1050,7 +609,6 @@ I18N: dict[str, dict[str, Any]] = {
         "exportado_ok": "Data exported to:\n{path}",
         "exportado_error": "Could not export:\n{e}",
         "todos": "All files",
-        # Uninstall
         "uninstall_title": "Uninstall FlowBreak",
         "uninstall_heading": "Uninstall",
         "uninstall_warning": "This will delete the app configuration and cannot be undone.",
@@ -1068,13 +626,11 @@ I18N: dict[str, dict[str, Any]] = {
         "uninstall_warn_msg": "Completed with some errors:\n\n",
         "uninstall_ok_title": "Uninstall complete",
         "uninstall_ok_msg": "FlowBreak has been uninstalled successfully.",
-        # Font size
         "section_font_size": "Font size",
         "font_pequeno": "Small",
         "font_normal": "Normal",
         "font_grande": "Large",
         "font_muy_grande": "Extra large",
-        # BreakWindow immersive / summary
         "break_fullscreen": "Fullscreen break",
         "break_voice": "Voice guide",
         "break_summary_title": "Break completed",
@@ -1085,11 +641,8 @@ I18N: dict[str, dict[str, Any]] = {
         "comenzar": "Start",
         "break_congrats_title": "Great job!",
         "break_congrats_desc": "You completed your active break. Your body thanks you.",
-        # ── New features ──
-        # Posture
         "postura_recordatorio": "Posture reminder",
         "postura_intervalo": "Posture reminder interval (min):",
-        # Pomodoro
         "pomodoro_trabajo": "Work (min)",
         "pomodoro_descanso_corto": "Short break (min)",
         "pomodoro_descanso_largo": "Long break (min)",
@@ -1097,14 +650,11 @@ I18N: dict[str, dict[str, Any]] = {
         "pomodoro_sesion_trabajo": "Work session",
         "pomodoro_sesion_descanso": "Break",
         "pomodoro_sesion_largo": "Long break",
-        # Compact
         "modo_compacto": "Compact mode",
         "compacto_desc": "Mini window with timer and basic controls",
-        # Floating
         "floating_timer": "Floating timer",
         "floating_desc": "Mini timer always visible on desktop",
         "floating_opacidad": "Floating timer opacity",
-        # Workout
         "workout": "Workout",
         "workouts": "My workouts",
         "workout_crear": "Create workout",
@@ -1114,7 +664,6 @@ I18N: dict[str, dict[str, Any]] = {
         "workout_guardar": "Save workout",
         "workout_ejecutar": "Start workout",
         "workout_vacia": "No workouts created",
-        # Achievements
         "logros": "Achievements",
         "logro_primera_pausa": "First break completed",
         "logro_5_pausas": "5 breaks in one day",
@@ -1127,24 +676,20 @@ I18N: dict[str, dict[str, Any]] = {
         "logro_night_owl": "Break after 8pm",
         "logro_water_10": "10 water reminders",
         "logro_desbloqueado": "Achievement unlocked!",
-        # Export/Import
         "importar_stats": "Import statistics",
         "exportar_ok": "Statistics exported to:\n{path}",
         "importar_ok": "Statistics imported successfully",
         "importar_error": "Import error: {error}",
-        # Custom hotkeys
         "section_hotkeys_custom": "Keyboard shortcuts",
         "hotkey_siguiente": "Next step/exercise",
         "hotkey_anterior": "Previous step/exercise",
         "hotkey_pausar": "Pause/resume timer",
         "hotkey_saltar": "Skip break",
-        # Sound
         "sound_packs": "Sound packs",
         "sound_pack_default": "Default",
         "sound_pack_nature": "Nature",
         "sound_pack_minimal": "Minimal",
         "sound_pack_activo": "Active pack",
-        # Tutorial
         "tutorial_paso1_titulo": "Step 1: Configure your breaks",
         "tutorial_paso1_desc": "Set how often you want to take an active break.",
         "tutorial_paso2_titulo": "Step 2: Choose exercises",
@@ -1165,15 +710,12 @@ I18N: dict[str, dict[str, Any]] = {
         "tutorial_feat_logros_desc": "Unlock achievements by being consistent",
         "tutorial_feat_stats": "Statistics",
         "tutorial_feat_stats_desc": "Review your daily progress",
-        # Fullscreen
         "fullscreen_timer": "Fullscreen mode",
         "fullscreen_desc": "Large timer fullscreen for presentations",
         "fullscreen_salir": "Exit fullscreen (Esc)",
-        # Toast
         "toast_info": "Information",
         "toast_exito": "Success",
         "toast_advertencia": "Warning",
-        # Motivational phrases
         "frases": [
             "Excellent! Your body thanks you.",
             "Every break is an investment in your health.",

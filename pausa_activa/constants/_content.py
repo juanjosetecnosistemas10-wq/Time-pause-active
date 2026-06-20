@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+from typing import Any
+
+DEFAULT_CONFIG: dict[str, Any] = {
+    "intervalo_min": 45,
+    "duracion_pausa_min": 5,
+    "hora_inicio": "08:00",
+    "hora_fin": "18:00",
+    "ejercicios_activos": [],
+    "sonido": True,
+    "posponer_min": 10,
+    "autoarranque": False,
+    "meta_pausas": 6,
+    "no_molestar": True,
+    "agua_activo": True,
+    "agua_min": 30,
+    "fin_de_semana": False,
+    "sonido_ambiente": "ninguno",
+    "primera_vez": True,
+    "tema": "oscuro",
+    "modo": "normal",
+    "perfil": "default",
+    "idioma": "es",
+    "notificacion_sonido": "default",
+    "notificacion_duracion": "short",
+    "tamano_letra": "normal",
+    "color_acento": "azul",
+    "fondo": "estandar",
+    "hotkeys_enabled": True,
+    "pantalla_completa": False,
+    "guia_voz": True,
+    "tts_activo": False,
+    "sonidos_personalizados": False,
+    "postura_recordatorio": False,
+    "postura_intervalo_min": 20,
+    "pomodoro_trabajo_min": 25,
+    "pomodoro_descanso_corto_min": 5,
+    "pomodoro_descanso_largo_min": 15,
+    "pomodoro_rondas_largas": 4,
+    "compacto_enabled": False,
+    "floating_enabled": False,
+    "floating_opacity": 85,
+    "workouts": [],
+    "workout_ultimo": None,
+    "logros_mostrados": [],
+    "hotkey_siguiente": "ctrl+right",
+    "hotkey_anterior": "ctrl+left",
+    "hotkey_pausar": "ctrl+space",
+    "hotkey_saltar": "ctrl+escape",
+    "color_personalizado_primary": "",
+    "color_personalizado_accent": "",
+    "sound_packs": ["default"],
+    "sound_pack_activo": "default",
+    "tutorial_paso": 0,
+    "tutorial_completado": False,
+    "fullscreen_tema": "oscuro",
+}
+
+EJERCICIOS_BUILTIN: list[dict[str, Any]] = [
+    {"id": "cuello",  "nombre": "Estiramiento de cuello",  "icono": "🧘", "instrucciones": "Libera la tensión del cuello y hombros acumulada por la pantalla.", "pasos": ["Inclina la cabeza a la derecha llevando la oreja al hombro 15 seg", "Inclina la cabeza a la izquierda llevando la oreja al hombro 15 seg", "Gira el cuello suavemente a la derecha y a la izquierda 5 veces cada lado"]},
+    {"id": "hombros", "nombre": "Estiramiento de hombros", "icono": "💪", "instrucciones": "Afloja los hombros rígidos por la mala postura frente al ordenador.", "pasos": ["Sube los hombros hasta las orejas aguantando 3 seg y suelta 10 veces", "Rota los hombros hacia atrás en círculos amplios 10 veces", "Rota los hombros hacia adelante en círculos amplios 10 veces"]},
+    {"id": "espalda", "nombre": "Estiramiento de espalda", "icono": "🏃", "instrucciones": "Estira la espalda para contrarrestar horas de estar sentado.", "pasos": ["Entrelaza las manos y estíralas hacia arriba con palmas al techo 15 seg", "Inclínate hacia adelante desde la cadera tocando los pies 15 seg", "Gira el tronco a la derecha y a la izquierda con manos en la cadera 5 veces"]},
+    {"id": "visual",  "nombre": "Descanso visual",         "icono": "👁️", "instrucciones": "Descansa tus ojos del brillo de la pantalla. Sigue la regla 20-20-20.", "pasos": ["Mira un objeto lejano a 6+ metros por 20 segundos", "Cierra los ojos y cúbrelos con las palmas sin presionar 15 seg", "Parpadea rápidamente 10 veces y haz círculos con los ojos 5 por lado"]},
+    {"id": "manos",   "nombre": "Ejercicio de manos y muñecas", "icono": "✋", "instrucciones": "Previene lesiones por escritura y uso del ratón.", "pasos": ["Extiende el brazo con palma arriba y empuja los dedos hacia abajo 12 seg cada mano", "Abre y cierra los puños extendiendo bien los dedos 10 veces", "Gira las muñecas en círculos 5 veces por lado"]},
+    {"id": "sentad",  "nombre": "Sentadillas y piernas",     "icono": "🏋️", "instrucciones": "Activa piernas y glúteos para mejorar la circulación.", "pasos": ["Levántate de la silla y baja en sentadilla hasta 90° con espalda recta 8 veces", "Eleva talones quedándote de puntillas 15 veces", "Eleva rodillas alternando como marchando en el sitio 20 veces"]},
+    {"id": "respira", "nombre": "Respiración profunda",      "icono": "🌬️", "instrucciones": "Oxigena tu cuerpo y relaja la mente con respiración consciente.", "pasos": ["Inhala profundamente por la nariz contando 4 seg", "Retén el aire contando 4 seg", "Exhala lentamente por la boca contando 6 seg. Repite 5 veces"]},
+    {"id": "caminar", "nombre": "Caminata activa en el sitio", "icono": "🚶", "instrucciones": "Activa la circulación caminando sin moverte del sitio.", "pasos": ["Marcha levantando las rodillas a la altura de la cadera 30 seg", "Balancea los brazos coordinados al caminar 30 seg", "Haz talones a los glúteos alternando piernas 30 seg"]},
+    {"id": "postura", "nombre": "Corrección de postura",     "icono": "🧍", "instrucciones": "Corrige la postura encorvada y fortalece la espalda alta.", "pasos": ["Párate derecho llevando hombros atrás y abajo, pecho abierto 15 seg", "Lleva los brazos en forma de W apretando omóplatos 12 veces", "Mantén la postura correcta respirando profundo 20 seg"]},
+    {"id": "cadera",  "nombre": "Movilidad de cadera",       "icono": "🔄", "instrucciones": "Afloja las caderas y la zona lumbar tras estar sentado.", "pasos": ["De pie, apoya manos en caderas y haz círculos amplios a la derecha 20 seg", "Repite círculos hacia la izquierda 20 seg", "Empuja la cadera adelante y atrás balanceando 10 veces"]},
+    {"id": "tobillos","nombre": "Movilidad de tobillos",     "icono": "🦶", "instrucciones": "Mejora la circulación de piernas y previene pies hinchados.", "pasos": ["Eleva un pie y rota el tobillo en círculos derecha 15 seg", "Rota el mismo tobillo a la izquierda 15 seg", "Cambia de pie y repite rotaciones 30 seg total"]},
+    {"id": "yoga",    "nombre": "Estiramiento de yoga silla", "icono": "🧎", "instrucciones": "Estira la espalda y relaja la mente con esta postura.", "pasos": ["Siéntate erguido al borde de la silla, estira brazos arriba 15 seg", "Inclínate hacia adelante dejando caer brazos y cabeza 15 seg", "Gira el tronco hacia la derecha y agarra el respaldo 10 seg cada lado"]},
+]
+
+EJERCICIOS: list[dict[str, Any]] = list(EJERCICIOS_BUILTIN)
+
+
+def load_ejercicios_from_file(filepath: str = "") -> list[dict[str, Any]]:
+    return list(EJERCICIOS_BUILTIN)
+
+
+WELLNESS_NOTES: list[dict[str, str]] = [
+    {"icon": "🧘", "title": "Respira profundo", "msg": "Inhala 4 seg, sostén 4 seg, exhala 6 seg. Repite 3 veces."},
+    {"icon": "💧", "title": "Hidrátate", "msg": "Tómate un vaso de agua. Tu cuerpo te lo agradecerá."},
+    {"icon": "👀", "title": "Descansa la vista", "msg": "Mira algo lejano a 6 metros por 20 segundos."},
+    {"icon": "🧍", "title": "Corrige tu postura", "msg": "Espalda recta, hombros relajados, pies en el suelo."},
+    {"icon": "🌞", "title": "Busca luz natural", "msg": "Si buscas una ventana. La luz natural mejora tu ánimo."},
+    {"icon": "🧠", "title": "Limpia tu mente", "msg": "Cierra los ojos 30 segundos y piensa en algo que te haga feliz."},
+    {"icon": "💪", "title": "Estira tu cuerpo", "msg": "Estira los brazos arriba y mantén 10 segundos."},
+    {"icon": "😊", "title": "Sonríe", "msg": "Una sonrisa libera endorfinas. ¡Hazlo ahora!"},
+    {"icon": "🪑", "title": "Levántate", "msg": "Si llevas más de 30 min sentado, párate y camina un momento."},
+    {"icon": "🎶", "title": "Escucha música", "msg": "Pon una canción que te guste y disfruta el momento."},
+    {"icon": "🌿", "title": "Conecta con la naturaleza", "msg": "Mira por la ventana o sal un momento al exterior."},
+    {"icon": "🫁", "title": "Oxigena tu cerebro", "msg": "5 respiraciones profundas aumentan tu concentración."},
+    {"icon": "💆", "title": "Relaja el cuello", "msg": "Inclina la cabeza suavemente a cada lado, 10 seg por lado."},
+    {"icon": "☕", "title": "Pausa consciente", "msg": "Si tomas café, disfrútalo sin mirar la pantalla."},
+    {"icon": "🙏", "title": "Agradece", "msg": "Piensa en 3 cosas buenas que te pasaron hoy."},
+    {"icon": "💪", "title": "Activa piernas", "msg": "Haz 10 sentadillas suaves para activar la circulación."},
+    {"icon": "🎵", "title": "Canta", "msg": "Canta tu canción favorita. Libera tensión y mejora el ánimo."},
+    {"icon": "🤗", "title": "Abrázate", "msg": "Un abrazo a ti mismo reduce el estrés. Hazlo ahora."},
+    {"icon": "🌺", "title": "Aromaterapia", "msg": "Si tienes aceite esencial, aplícalo en las muñecas."},
+    {"icon": "😴", "title": "Poder del sueño", "msg": "Dormir 7-8 horas mejora tu productividad un 30%."},
+]

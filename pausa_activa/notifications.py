@@ -27,15 +27,14 @@ def send_win_notification(
             )
             if sound and sound.lower() != "none":
                 try:
-                    from winotify import audio as winaudio
                     sound_map = {
-                        "default": winaudio.Default,
-                        "sms": winaudio.SMS,
-                        "mail": winaudio.Mail,
-                        "reminder": winaudio.Reminder,
-                        "loop": winaudio.LoopingCall,
+                        "default": audio.Default,
+                        "sms": audio.SMS,
+                        "mail": audio.Mail,
+                        "reminder": audio.Reminder,
+                        "loop": audio.LoopingCall,
                     }
-                    toast.set_audio(sound_map.get(sound, winaudio.Default), loop=False)
+                    toast.set_audio(sound_map.get(sound, audio.Default), loop=False)
                 except Exception:
                     pass
             toast.show()

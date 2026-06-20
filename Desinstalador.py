@@ -1,10 +1,10 @@
 """Standalone uninstaller for FlowBreak."""
 import os
-import sys
 import subprocess
 import tkinter as tk
 import tkinter.messagebox as mb
 import winreg
+
 
 def main() -> None:
     root = tk.Tk()

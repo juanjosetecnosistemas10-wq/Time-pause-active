@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import random
 import struct
@@ -9,7 +10,6 @@ import threading
 import time
 import wave
 import winsound
-import math
 
 from pausa_activa.constants import log
 
@@ -30,7 +30,7 @@ class AudioManager:
         sample_rate: int = 22050
         n_samples: int = sample_rate * duracion_seg
         factor: float = math.pi / (sample_rate * duracion_seg)
-        
+
         samples: list[int] = []
         for i in range(n_samples):
             envelope: float = 0.5 + 0.5 * math.sin(i * factor)
@@ -41,7 +41,7 @@ class AudioManager:
             elif sample > 32767:
                 sample = 32767
             samples.append(sample)
-            
+
         data = struct.pack(f"<{len(samples)}h", *samples)
         with wave.open(path, "w") as wf:
             wf.setnchannels(1)
@@ -52,12 +52,12 @@ class AudioManager:
     def _generar_wav_naturaleza(self, path: str, duracion_seg: int = 30) -> None:
         sample_rate: int = 22050
         n_samples: int = sample_rate * duracion_seg
-        
+
         freqs = [400, 550, 700, 850, 1000]
         factor_env = math.pi / (sample_rate * duracion_seg)
         c1 = [2 * math.pi * freq / sample_rate for freq in freqs]
         c2 = [2 * math.pi * freq * 1.5 / sample_rate for freq in freqs]
-        
+
         samples: list[int] = []
         for i in range(n_samples):
             envelope: float = 0.5 + 0.5 * math.sin(i * factor_env)
@@ -71,7 +71,7 @@ class AudioManager:
             elif sample > 32767:
                 sample = 32767
             samples.append(sample)
-            
+
         data = struct.pack(f"<{len(samples)}h", *samples)
         with wave.open(path, "w") as wf:
             wf.setnchannels(1)

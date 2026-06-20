@@ -1,7 +1,9 @@
 """Build a multi-resolution ICO with a person doing active stretches."""
-import struct, io, os, math
-from PIL import Image, ImageDraw
+import io
+import os
+import struct
 
+from PIL import Image, ImageDraw
 
 SIZES = [16, 20, 24, 32, 48, 64, 96, 128, 192, 256]
 
